@@ -13,7 +13,7 @@ COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 
 TIMEOUT = 15.0
 HEADERS = {
-    "User-Agent": "OutdoorTripPlanner/1.0 (https://github.com/outdoor-trip-planner; contact@example.com) httpx"
+    "User-Agent": "OutdoorTripPlanner/1.0 (https://github.com/bartromgens/outdoor-trip-planner; contact@example.com) httpx"
 }
 
 

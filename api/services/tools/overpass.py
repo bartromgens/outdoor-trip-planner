@@ -66,9 +66,18 @@ def _ensure_query_settings(query: str) -> str:
     if "[timeout:" in query and "[maxsize:" in query:
         return query
     timeout_decl = f"[timeout:{DEFAULT_TIMEOUT_SEC}]"
-    maxsize_decl = f"[maxsize:{DEFAULT_MAXSIZE_BYTES}];"
-    prefix = timeout_decl + maxsize_decl
-    return prefix + query.lstrip()
+    maxsize_decl = f"[maxsize:{DEFAULT_MAXSIZE_BYTES}]"
+    stripped = query.lstrip()
+    if stripped.startswith("["):
+        idx = stripped.index(";")
+        settings = stripped[:idx]
+        rest = stripped[idx:]
+        if "[timeout:" not in settings:
+            settings += timeout_decl
+        if "[maxsize:" not in settings:
+            settings += maxsize_decl
+        return settings + rest
+    return f"{timeout_decl}{maxsize_decl};" + stripped
 
 
 def _prepare_query(query: str) -> str:
@@ -135,13 +144,15 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
         "name": "query_overpass",
         "description": (
             "Execute an Overpass QL query to search OpenStreetMap data. "
-            "Use this to find hiking trails, mountain huts, campsites, "
-            "water sources, viewpoints, peaks, parking areas, and other "
-            "geographic features. Always request JSON output with "
-            "[out:json]. For ways and relations, add 'out center;' or "
-            "'out geom;' to get coordinates. Queries are limited to a "
-            "20x20 km area: use a bbox (south,west,north,east) or "
-            "(around:radius,lat,lon) with radius in meters (max 20000)."
+            "SLOW AND UNRELIABLE — use only as a last resort when no other "
+            "tool (web search, Wikipedia) can answer the question. "
+            "Appropriate only for explicit proximity searches such as "
+            "'find all huts within 5 km of point X'. "
+            "Always request JSON output with [out:json]. "
+            "For ways and relations, add 'out center;' or 'out geom;' to "
+            "get coordinates. Queries are limited to a 20x20 km area: use "
+            "a bbox (south,west,north,east) or (around:radius,lat,lon) "
+            "with radius in meters (max 20000)."
         ),
         "input_schema": {
             "type": "object",

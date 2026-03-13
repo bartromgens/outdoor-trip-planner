@@ -32,12 +32,17 @@ interface FinalEvent {
   messages: ChatMessage[];
 }
 
+interface MapUpdateEvent {
+  type: 'map_update';
+  map_features: GeoJSON.FeatureCollection;
+}
+
 interface ErrorEvent {
   type: 'error';
   message: string;
 }
 
-type AgentEvent = ToolCallEvent | FinalEvent | ErrorEvent;
+type AgentEvent = ToolCallEvent | MapUpdateEvent | FinalEvent | ErrorEvent;
 
 @Injectable({ providedIn: 'root' })
 export class ChatService {
@@ -130,6 +135,8 @@ export class ChatService {
   private handleEvent(event: AgentEvent): void {
     if (event.type === 'tool_call') {
       this.toolActivity$.next(event.label);
+    } else if (event.type === 'map_update') {
+      this.mapFeatures$.next(event.map_features);
     } else if (event.type === 'final') {
       this.apiMessages = event.messages;
       const updated = this.displayMessages$.value;

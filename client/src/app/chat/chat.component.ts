@@ -50,6 +50,10 @@ export class ChatComponent implements AfterViewChecked {
     this.chatService.stop();
   }
 
+  clear(): void {
+    this.chatService.reset();
+  }
+
   onKeydown(event: KeyboardEvent): void {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
