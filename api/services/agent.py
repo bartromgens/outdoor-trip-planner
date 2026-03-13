@@ -105,20 +105,6 @@ def _build_system_prompt(bbox: dict[str, float] | None) -> str:
     return SYSTEM_PROMPT + bbox_section
 
 
-def _cached_system(text: str) -> list[dict[str, Any]]:
-    return [{"type": "text", "text": text, "cache_control": {"type": "ephemeral"}}]
-
-
-def _cached_tools(tools: list[Any]) -> list[Any]:
-    if not tools:
-        return tools
-    tools = list(tools)
-    last = dict(tools[-1])
-    last["cache_control"] = {"type": "ephemeral"}
-    tools[-1] = last
-    return tools
-
-
 def _truncate_tool_result(text: str) -> str:
     if len(text) <= MAX_TOOL_RESULT_CHARS:
         return text
@@ -179,14 +165,14 @@ def stream_agent_events(
         f"yes ({bbox})" if bbox else "none",
     )
 
-    all_tools: list[Any] = _cached_tools([WEB_SEARCH_TOOL, *ALL_TOOL_DEFINITIONS])
-    cached_system = _cached_system(system_prompt)
+    all_tools: list[Any] = [WEB_SEARCH_TOOL, *ALL_TOOL_DEFINITIONS]
 
     t0 = time.perf_counter()
     response = client.messages.create(
         model=model,
         max_tokens=4096,
-        system=cached_system,
+        cache_control={"type": "ephemeral"},
+        system=system_prompt,
         tools=all_tools,
         messages=messages,
     )
@@ -258,7 +244,8 @@ def stream_agent_events(
         response = client.messages.create(
             model=model,
             max_tokens=4096,
-            system=cached_system,
+            cache_control={"type": "ephemeral"},
+            system=system_prompt,
             tools=all_tools,
             messages=messages,
             **({"container": container_id} if container_id else {}),
@@ -313,14 +300,14 @@ def run_agent(
         f"yes ({bbox})" if bbox else "none",
     )
 
-    all_tools: list[Any] = _cached_tools([WEB_SEARCH_TOOL, *ALL_TOOL_DEFINITIONS])
-    cached_system = _cached_system(system_prompt)
+    all_tools: list[Any] = [WEB_SEARCH_TOOL, *ALL_TOOL_DEFINITIONS]
 
     t0 = time.perf_counter()
     response = client.messages.create(
         model=model,
         max_tokens=4096,
-        system=cached_system,
+        cache_control={"type": "ephemeral"},
+        system=system_prompt,
         tools=all_tools,
         messages=messages,
     )
@@ -383,7 +370,8 @@ def run_agent(
         response = client.messages.create(
             model=model,
             max_tokens=4096,
-            system=cached_system,
+            cache_control={"type": "ephemeral"},
+            system=system_prompt,
             tools=all_tools,
             messages=messages,
             **({"container": container_id} if container_id else {}),
