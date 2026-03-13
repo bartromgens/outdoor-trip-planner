@@ -1,4 +1,4 @@
-import { Component, AfterViewInit, OnDestroy, inject, NgZone } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, inject, NgZone, ChangeDetectorRef } from '@angular/core';
 import * as L from 'leaflet';
 import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
@@ -96,6 +96,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private locationService = inject(LocationService);
   private dialog = inject(MatDialog);
   private ngZone = inject(NgZone);
+  private cdr = inject(ChangeDetectorRef);
   private map!: L.Map;
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
@@ -170,8 +171,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   private onMapClick(e: L.LeafletMouseEvent): void {
     const { lat, lng } = e.latlng;
+    this.addingLocation = false;
+    this.cdr.detectChanges();
     this.ngZone.run(() => {
-      this.addingLocation = false;
       const ref = this.dialog.open(AddLocationDialogComponent, {
         data: { lat, lng },
         width: '360px',
