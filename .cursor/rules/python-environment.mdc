@@ -1,0 +1,13 @@
+---
+description: Use the project Python virtualenv at ./env
+alwaysApply: true
+---
+
+# Python environment
+
+Use the project’s virtualenv for all Python commands (run, test, install, scripts).
+
+- Path: `./env` (project root)
+- Activate: `source ./env/bin/activate`
+
+Do not rely on a system or other Python; always use `./env`.

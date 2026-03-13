@@ -1,0 +1,57 @@
+<div class="chat-container">
+  <div class="messages" #scrollContainer>
+    @for (msg of messages$ | async; track $index) {
+      <div
+        class="message"
+        [class.user]="msg.role === 'user'"
+        [class.assistant]="msg.role === 'assistant'"
+      >
+        @if (msg.role === 'assistant') {
+          <div class="bubble markdown" [innerHTML]="msg.text | markdown"></div>
+        } @else {
+          <div class="bubble">{{ msg.text }}</div>
+        }
+      </div>
+    }
+    @if (loading$ | async) {
+      <div class="message assistant">
+        <div class="bubble thinking">
+          @if (toolActivity$ | async; as activity) {
+            <span class="tool-activity">{{ activity }}</span>
+          } @else {
+            Thinking&hellip;
+          }
+        </div>
+      </div>
+    }
+  </div>
+
+  <div class="input-area">
+    @if (loading$ | async) {
+      <mat-progress-bar mode="indeterminate"></mat-progress-bar>
+    }
+    <div class="input-row">
+      <mat-form-field appearance="outline" class="input-field">
+        <textarea
+          matInput
+          [(ngModel)]="inputText"
+          (keydown)="onKeydown($event)"
+          placeholder="Plan a trip..."
+          rows="1"
+          cdkTextareaAutosize
+          cdkAutosizeMinRows="1"
+          cdkAutosizeMaxRows="4"
+        ></textarea>
+      </mat-form-field>
+      @if (loading$ | async) {
+        <button mat-icon-button color="warn" (click)="stop()" title="Stop">
+          <mat-icon>stop</mat-icon>
+        </button>
+      } @else {
+        <button mat-icon-button color="primary" (click)="send()" [disabled]="!inputText.trim()">
+          <mat-icon>send</mat-icon>
+        </button>
+      }
+    </div>
+  </div>
+</div>

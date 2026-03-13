@@ -1,18 +1,10 @@
 <mat-toolbar color="primary">
-  <button mat-icon-button (click)="sidenavOpen.set(!sidenavOpen())">
-    <mat-icon>menu</mat-icon>
-  </button>
   <span>{{ title() }}</span>
 </mat-toolbar>
 
 <mat-sidenav-container class="sidenav-container">
-  <mat-sidenav mode="side" [opened]="sidenavOpen()">
-    <mat-nav-list>
-      <a mat-list-item routerLink="/">
-        <mat-icon matListItemIcon>home</mat-icon>
-        <span matListItemTitle>Home</span>
-      </a>
-    </mat-nav-list>
+  <mat-sidenav mode="side" opened>
+    <app-chat />
   </mat-sidenav>
 
   <mat-sidenav-content>

@@ -1,0 +1,23 @@
+---
+description: Project-wide conventions
+alwaysApply: true
+---
+
+# Project Rules
+
+## Documentation
+
+- Do not add docstrings on new code or create README.md documentation unless the user explicitly asks for it.
+
+## End of Session
+
+- Review changes and remove duplicate code.
+- Extract functions and classes to improve readability and encapsulate logic.
+- Run black and prettier formatters.
+- When finishing a set of changes, suggest a short commit message at the end. Start the message with a capital letter.
+
+## Formatting
+
+- Formatting: Use Black for Python and Prettier for frontend.
+- Linting: Use Flake8 for style and lint checks.
+- Type hints: Add type hints.
