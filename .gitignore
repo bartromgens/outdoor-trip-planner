@@ -57,3 +57,4 @@ yarn-error.log*
 .env
 .env.*
 !.env.example
+client/src/environments/environment.ts

@@ -3,6 +3,7 @@ import * as L from 'leaflet';
 import { Subscription } from 'rxjs';
 import { ChatService } from '../services/chat.service';
 import type { BoundingBox } from '../services/chat.service';
+import { environment } from '../../environments/environment';
 
 const CATEGORY_COLORS: Record<string, string> = {
   trail: '#e65100',
@@ -39,6 +40,21 @@ function iconForCategory(category?: string): L.DivIcon {
   });
 }
 
+function buildTransportLayer(): L.TileLayer {
+  const key = environment.thunderforestApiKey;
+  if (key) {
+    return L.tileLayer(`https://tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=${key}`, {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://www.thunderforest.com/">Thunderforest</a>',
+      maxZoom: 22,
+    });
+  }
+  return L.tileLayer('https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png', {
+    attribution:
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://memomaps.de/">memomaps</a>',
+  });
+}
+
 @Component({
   selector: 'app-map',
   templateUrl: './map.component.html',
@@ -53,10 +69,25 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   ngAfterViewInit(): void {
     this.map = L.map('map').setView([46.8182, 8.2275], 8);
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    }).addTo(this.map);
+    });
+
+    const transportLayer = buildTransportLayer();
+
+    osmLayer.addTo(this.map);
+
+    L.control
+      .layers(
+        {
+          Standard: osmLayer,
+          Transport: transportLayer,
+        },
+        undefined,
+        { collapsed: true },
+      )
+      .addTo(this.map);
 
     this.emitBbox();
     this.map.on('moveend', () => this.emitBbox());
