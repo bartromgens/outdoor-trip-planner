@@ -7,7 +7,7 @@ DISPLAY_TOOLS = {"show_on_map"}
 ALL_TOOL_DEFINITIONS: list[dict[str, Any]] = [
     # *wikipedia.TOOL_DEFINITIONS,
     # *overpass.TOOL_DEFINITIONS,
-    # *transport.TOOL_DEFINITIONS,
+    *transport.TOOL_DEFINITIONS,
     *display.TOOL_DEFINITIONS,
     *wikidata.TOOL_DEFINITIONS,
 ]

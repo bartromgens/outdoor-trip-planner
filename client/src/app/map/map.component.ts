@@ -1,4 +1,11 @@
-import { Component, AfterViewInit, OnDestroy, inject, NgZone, ChangeDetectorRef } from '@angular/core';
+import {
+  Component,
+  AfterViewInit,
+  OnDestroy,
+  inject,
+  NgZone,
+  ChangeDetectorRef,
+} from '@angular/core';
 import * as L from 'leaflet';
 import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
@@ -70,6 +77,22 @@ function savedIconForCategory(category?: string): L.DivIcon {
   });
 }
 
+interface ContourConfig {
+  level: number;
+  label: string;
+  color: string;
+  weight: number;
+  dashArray?: string;
+}
+
+const CONTOUR_CONFIGS: ContourConfig[] = [
+  { level: 1500, label: 'Contour 1500 m', color: '#a0522d', weight: 1.5, dashArray: '6 4' },
+  { level: 1750, label: 'Contour 1750 m', color: '#964b1a', weight: 1.8, dashArray: '7 4' },
+  { level: 2000, label: 'Contour 2000 m', color: '#8b3a0f', weight: 2, dashArray: '8 4' },
+  { level: 2500, label: 'Contour 2500 m', color: '#6b2800', weight: 2.5 },
+  { level: 3000, label: 'Contour 3000 m', color: '#4a1500', weight: 3 },
+];
+
 function buildTransportLayer(): L.TileLayer {
   const key = environment.thunderforestApiKey;
   if (key) {
@@ -98,6 +121,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
   private map!: L.Map;
+  private layerControl!: L.Control.Layers;
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
   private subscription?: Subscription;
@@ -124,7 +148,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
     osmLayer.addTo(this.map);
 
-    L.control
+    this.layerControl = L.control
       .layers(
         {
           Standard: osmLayer,
@@ -136,6 +160,8 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       )
       .addTo(this.map);
 
+    L.control.scale({ imperial: false }).addTo(this.map);
+
     this.emitBbox();
     this.map.on('moveend', () => this.emitBbox());
 
@@ -145,6 +171,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     });
 
     this.loadSavedLocations();
+    this.loadContourLayers();
   }
 
   private emitBbox(): void {
@@ -227,6 +254,28 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       }).addTo(this.map);
     } catch {
       // Silently ignore load errors on startup
+    }
+  }
+
+  private async loadContourLayers(): Promise<void> {
+    for (const cfg of CONTOUR_CONFIGS) {
+      try {
+        const response = await fetch(`/api/contours/${cfg.level}/`);
+        if (!response.ok) continue;
+        const geojson: GeoJSON.FeatureCollection = await response.json();
+        const layer = L.geoJSON(geojson, {
+          style: {
+            color: cfg.color,
+            weight: cfg.weight,
+            opacity: 0.8,
+            dashArray: cfg.dashArray,
+            fill: false,
+          },
+        });
+        this.layerControl.addOverlay(layer, cfg.label);
+      } catch {
+        // Silently skip unavailable contour levels
+      }
     }
   }
 

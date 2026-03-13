@@ -1,8 +1,9 @@
 import json
 import logging
+from pathlib import Path
 from typing import Any
 
-from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
+from django.http import FileResponse, HttpRequest, HttpResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from rest_framework import serializers, status
@@ -16,6 +17,9 @@ from .services.agent import run_agent, stream_agent_events
 from .services.tools.wikidata import find_place_info
 
 logger = logging.getLogger(__name__)
+
+CONTOURS_DIR = Path(__file__).resolve().parent / "static" / "contours"
+VALID_CONTOUR_LEVELS = {1500, 1750, 2000, 2500, 3000}
 
 
 @api_view(["GET"])
@@ -137,6 +141,28 @@ def location_detail(request: Request, pk: int) -> Response:
 
     location.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+def contour(request: Request, elevation: int) -> Response:
+    if elevation not in VALID_CONTOUR_LEVELS:
+        return Response(
+            {
+                "error": f"Invalid elevation. Choose from {sorted(VALID_CONTOUR_LEVELS)}."
+            },
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+    path = CONTOURS_DIR / f"contour_{elevation}.geojson"
+    if not path.exists():
+        return Response(
+            {
+                "error": "Contour data not yet generated. Run manage.py generate_contours."
+            },
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    response = FileResponse(path.open("rb"), content_type="application/geo+json")
+    response["Cache-Control"] = "public, max-age=86400"
+    return response
 
 
 @csrf_exempt

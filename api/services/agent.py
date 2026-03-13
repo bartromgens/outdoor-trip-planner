@@ -14,7 +14,14 @@ logger = logging.getLogger(__name__)
 MAX_TOOL_ROUNDS = 15
 MAX_TOOL_RESULT_CHARS = 8_000
 
-WEB_SEARCH_TOOL: dict[str, str] = {"type": "web_search_20250305", "name": "web_search"}
+_WEB_SEARCH_DYNAMIC_FILTERING_MODELS = {"claude-sonnet-4-6", "claude-opus-4-6"}
+
+
+def _web_search_tool(model: str) -> dict[str, str]:
+    if model in _WEB_SEARCH_DYNAMIC_FILTERING_MODELS:
+        return {"type": "web_search_20260209", "name": "web_search"}
+    return {"type": "web_search_20250305", "name": "web_search"}
+
 
 _RESULT_PREVIEW_LEN = 200
 
@@ -175,7 +182,7 @@ def stream_agent_events(
         f"yes ({bbox})" if bbox else "none",
     )
 
-    all_tools: list[Any] = [WEB_SEARCH_TOOL, *ALL_TOOL_DEFINITIONS]
+    all_tools: list[Any] = [_web_search_tool(model), *ALL_TOOL_DEFINITIONS]
 
     t0 = time.perf_counter()
     response = client.messages.create(
@@ -273,6 +280,24 @@ def stream_agent_events(
     final_content = _serialize_content(response.content)
     messages.append({"role": "assistant", "content": final_content})
 
+    if response.stop_reason in ("tool_use", "pause_turn"):
+        unresolved = [b for b in final_content if b.get("type") == "tool_use"]
+        if unresolved:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": b["id"],
+                            "content": "Maximum tool rounds reached.",
+                            "is_error": True,
+                        }
+                        for b in unresolved
+                    ],
+                }
+            )
+
     final_text = _extract_text(response.content)
     geojson = features_to_geojson(map_features) if map_features else None
     logger.info(
@@ -315,7 +340,7 @@ def run_agent(
         f"yes ({bbox})" if bbox else "none",
     )
 
-    all_tools: list[Any] = [WEB_SEARCH_TOOL, *ALL_TOOL_DEFINITIONS]
+    all_tools: list[Any] = [_web_search_tool(model), *ALL_TOOL_DEFINITIONS]
 
     t0 = time.perf_counter()
     response = client.messages.create(
@@ -403,6 +428,24 @@ def run_agent(
 
     final_content = _serialize_content(response.content)
     messages.append({"role": "assistant", "content": final_content})
+
+    if response.stop_reason in ("tool_use", "pause_turn"):
+        unresolved = [b for b in final_content if b.get("type") == "tool_use"]
+        if unresolved:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "tool_result",
+                            "tool_use_id": b["id"],
+                            "content": "Maximum tool rounds reached.",
+                            "is_error": True,
+                        }
+                        for b in unresolved
+                    ],
+                }
+            )
 
     final_text = _extract_text(response.content)
     geojson = features_to_geojson(map_features) if map_features else None
