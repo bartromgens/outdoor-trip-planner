@@ -194,6 +194,11 @@ def stream_agent_events(
         if response.stop_reason == "pause_turn":
             for block in response.content:
                 if getattr(block, "type", None) == "server_tool_use":
+                    if block.name == "web_search":
+                        logger.info(
+                            "Agent used web_search  query=%s",
+                            block.input.get("query", ""),
+                        )
                     label = _tool_label(block.name, block.input)
                     logger.info(
                         "Server tool  %-28s  input=%s",
@@ -329,6 +334,11 @@ def run_agent(
         if response.stop_reason == "pause_turn":
             for block in response.content:
                 if getattr(block, "type", None) == "server_tool_use":
+                    if block.name == "web_search":
+                        logger.info(
+                            "Agent used web_search  query=%s",
+                            block.input.get("query", ""),
+                        )
                     logger.info(
                         "Server tool  %-28s  input=%s",
                         block.name,
