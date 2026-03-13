@@ -5,10 +5,13 @@ from typing import Any
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
+from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from .models import Location
+from .serializers import LocationSerializer
 from .services.agent import run_agent, stream_agent_events
 
 logger = logging.getLogger(__name__)
@@ -59,6 +62,53 @@ def _ndjson_event_stream(
         logger.exception("Agent stream error")
         error_event = {"type": "error", "message": "An error occurred."}
         yield json.dumps(error_event) + "\n"
+
+
+@api_view(["GET", "POST"])
+def locations(request: Request) -> Response:
+    if request.method == "GET":
+        qs = Location.objects.all()
+        category = request.query_params.get("category")
+        if category:
+            qs = qs.filter(category=category)
+        serializer = LocationSerializer(qs, many=True)
+        return Response(serializer.data)
+
+    serializer = LocationSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+
+    existing = Location.objects.filter(
+        name=serializer.validated_data["name"],
+        latitude=serializer.validated_data["latitude"],
+        longitude=serializer.validated_data["longitude"],
+    ).first()
+    if existing:
+        return Response(LocationSerializer(existing).data, status=status.HTTP_200_OK)
+
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "DELETE"])
+def location_detail(request: Request, pk: int) -> Response:
+    try:
+        location = Location.objects.get(pk=pk)
+    except Location.DoesNotExist:
+        return Response(
+            {"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == "GET":
+        return Response(LocationSerializer(location).data)
+
+    if request.method == "PUT":
+        serializer = LocationSerializer(location, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    location.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @csrf_exempt

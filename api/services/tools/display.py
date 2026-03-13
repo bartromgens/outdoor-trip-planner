@@ -1,5 +1,8 @@
 import json
+import logging
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def features_to_geojson(
@@ -36,6 +39,41 @@ def features_to_geojson(
     return {"type": "FeatureCollection", "features": geo_features}
 
 
+def _extract_point_coords(feature: dict[str, Any]) -> tuple[float, float] | None:
+    coords = feature.get("coordinates", [])
+    geom = feature.get("geometry_type", "point")
+    if geom == "point" and isinstance(coords, list) and len(coords) >= 2:
+        return coords[1], coords[0]  # lat, lon
+    if geom in ("line", "polygon") and isinstance(coords, list) and coords:
+        first = coords[0]
+        if isinstance(first, list) and len(first) >= 2:
+            return first[1], first[0]
+    return None
+
+
+def _save_features_to_db(features: list[dict[str, Any]]) -> int:
+    from api.models import Location
+
+    saved = 0
+    for f in features:
+        point = _extract_point_coords(f)
+        if point is None:
+            continue
+        lat, lon = point
+        Location.objects.create(
+            name=f.get("label", ""),
+            latitude=lat,
+            longitude=lon,
+            description=f.get("description", ""),
+            category=f.get("category", ""),
+            geometry_type=f.get("geometry_type", "point"),
+            coordinates=f.get("coordinates", []),
+            altitude=f.get("altitude"),
+        )
+        saved += 1
+    return saved
+
+
 def handle_show_on_map(
     tool_input: dict[str, Any],
     map_features: list[dict[str, Any]],
@@ -43,6 +81,7 @@ def handle_show_on_map(
     features = tool_input.get("features", [])
     for f in features:
         map_features.append(f)
+
     count = len(features)
     return json.dumps({"status": "ok", "message": f"{count} feature(s) added to map"})
 
