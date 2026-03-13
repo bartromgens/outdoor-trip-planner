@@ -1,6 +1,6 @@
 from typing import Any
 
-from . import display, overpass, transport, wikipedia
+from . import display, overpass, transport, wikipedia, wikidata
 
 DISPLAY_TOOLS = {"show_on_map"}
 
@@ -9,12 +9,14 @@ ALL_TOOL_DEFINITIONS: list[dict[str, Any]] = [
     # *overpass.TOOL_DEFINITIONS,
     # *transport.TOOL_DEFINITIONS,
     *display.TOOL_DEFINITIONS,
+    *wikidata.TOOL_DEFINITIONS,
 ]
 
 _DATA_HANDLERS: dict[str, Any] = {
     **wikipedia.TOOL_HANDLERS,
     **overpass.TOOL_HANDLERS,
     **transport.TOOL_HANDLERS,
+    **wikidata.TOOL_HANDLERS,
 }
 
 

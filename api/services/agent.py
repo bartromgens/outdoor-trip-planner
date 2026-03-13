@@ -34,6 +34,9 @@ interactive map.
 
 - When you find geographic results (locations, trails, POIs, routes), \
 always call `show_on_map` so the user can see them visually.
+- For towns, villages, or other named places, use `get_place_coordinates` \
+with a list of place names to get accurate coordinates and elevation from \
+Wikidata. Then pass the results to `show_on_map` as point features.
 """
 
 
@@ -82,6 +85,12 @@ def _tool_label(name: str, tool_input: dict[str, Any]) -> str:
         case "show_on_map":
             n = len(tool_input.get("features", []))
             return f"Adding {n} feature(s) to map"
+        case "get_place_coordinates":
+            places = tool_input.get("places", [])
+            country = tool_input.get("country")
+            if country:
+                return f"Looking up coordinates for {len(places)} place(s) in {country}"
+            return f"Looking up coordinates for {len(places)} place(s)"
         case _:
             return f"Using tool: {name}"
 
