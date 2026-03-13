@@ -12,6 +12,7 @@ class LocationSerializer(serializers.ModelSerializer):
             "latitude",
             "longitude",
             "altitude",
+            "wikidata_id",
             "description",
             "category",
             "geometry_type",

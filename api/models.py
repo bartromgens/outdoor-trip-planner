@@ -12,6 +12,7 @@ class Location(models.Model):
     latitude = models.FloatField()
     longitude = models.FloatField()
     altitude = models.FloatField(null=True, blank=True)
+    wikidata_id = models.CharField(max_length=20, blank=True, default="")
     description = models.TextField(blank=True, default="")
     category = models.CharField(max_length=100, blank=True, default="")
     geometry_type = models.CharField(

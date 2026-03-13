@@ -5,7 +5,7 @@ from typing import Any
 from django.http import HttpRequest, HttpResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from rest_framework import status
+from rest_framework import serializers, status
 from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -13,6 +13,7 @@ from rest_framework.response import Response
 from .models import Location
 from .serializers import LocationSerializer
 from .services.agent import run_agent, stream_agent_events
+from .services.tools.wikidata import find_place_info
 
 logger = logging.getLogger(__name__)
 
@@ -74,18 +75,45 @@ def locations(request: Request) -> Response:
         serializer = LocationSerializer(qs, many=True)
         return Response(serializer.data)
 
+    try:
+        existing = Location.objects.filter(
+            name=request.data.get("name"),
+            latitude=float(request.data.get("latitude", 0)),
+            longitude=float(request.data.get("longitude", 0)),
+        ).first()
+        if existing:
+            return Response(
+                LocationSerializer(existing).data, status=status.HTTP_200_OK
+            )
+    except (TypeError, ValueError):
+        pass
+
     serializer = LocationSerializer(data=request.data)
-    serializer.is_valid(raise_exception=True)
+    if not serializer.is_valid():
+        logger.warning(
+            "Location save rejected  errors=%s  data=%s",
+            serializer.errors,
+            request.data,
+        )
+        raise serializers.ValidationError(serializer.errors)
 
-    existing = Location.objects.filter(
-        name=serializer.validated_data["name"],
-        latitude=serializer.validated_data["latitude"],
-        longitude=serializer.validated_data["longitude"],
-    ).first()
-    if existing:
-        return Response(LocationSerializer(existing).data, status=status.HTTP_200_OK)
+    extra: dict = {}
+    if not serializer.validated_data.get("wikidata_id"):
+        try:
+            info = find_place_info(serializer.validated_data["name"])
+            if info:
+                if info["wikidata_id"]:
+                    extra["wikidata_id"] = info["wikidata_id"]
+                if info[
+                    "elevation_m"
+                ] is not None and not serializer.validated_data.get("altitude"):
+                    extra["altitude"] = info["elevation_m"]
+        except Exception:
+            logger.warning(
+                "Wikidata enrichment failed for %r", serializer.validated_data["name"]
+            )
 
-    serializer.save()
+    serializer.save(**extra)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 

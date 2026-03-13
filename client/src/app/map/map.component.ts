@@ -1,10 +1,16 @@
-import { Component, AfterViewInit, OnDestroy, inject } from '@angular/core';
+import { Component, AfterViewInit, OnDestroy, inject, NgZone } from '@angular/core';
 import * as L from 'leaflet';
 import { Subscription } from 'rxjs';
+import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
 import type { BoundingBox } from '../services/chat.service';
 import { environment } from '../../environments/environment';
+import {
+  AddLocationDialogComponent,
+  type AddLocationDialogResult,
+} from './add-location-dialog.component';
 
 const CATEGORY_COLORS: Record<string, string> = {
   trail: '#e65100',
@@ -83,14 +89,18 @@ function buildTransportLayer(): L.TileLayer {
   selector: 'app-map',
   templateUrl: './map.component.html',
   styleUrl: './map.component.scss',
+  imports: [MatButtonModule],
 })
 export class MapComponent implements AfterViewInit, OnDestroy {
   private chatService = inject(ChatService);
   private locationService = inject(LocationService);
+  private dialog = inject(MatDialog);
+  private ngZone = inject(NgZone);
   private map!: L.Map;
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
   private subscription?: Subscription;
+  addingLocation = false;
 
   ngAfterViewInit(): void {
     this.map = L.map('map').setView([46.8182, 8.2275], 8);
@@ -145,6 +155,35 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       east: b.getEast(),
     };
     this.chatService.setBbox(bbox);
+  }
+
+  toggleAddLocation(): void {
+    this.addingLocation = !this.addingLocation;
+    if (this.addingLocation) {
+      setTimeout(() => {
+        this.map.once('click', (e: L.LeafletMouseEvent) => this.onMapClick(e));
+      }, 0);
+    } else {
+      this.map.off('click');
+    }
+  }
+
+  private onMapClick(e: L.LeafletMouseEvent): void {
+    const { lat, lng } = e.latlng;
+    this.ngZone.run(() => {
+      this.addingLocation = false;
+      const ref = this.dialog.open(AddLocationDialogComponent, {
+        data: { lat, lng },
+        width: '360px',
+      });
+      ref.afterClosed().subscribe((result: AddLocationDialogResult | undefined) => {
+        if (!result) return;
+        this.locationService
+          .savePoint(lat, lng, result.name, result.category, result.description)
+          .then(() => this.loadSavedLocations())
+          .catch((err) => console.error('Failed to save location', err));
+      });
+    });
   }
 
   ngOnDestroy(): void {

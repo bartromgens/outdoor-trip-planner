@@ -27,6 +27,10 @@ def features_to_geojson(
             properties["description"] = f["description"]
         if f.get("category"):
             properties["category"] = f["category"]
+        if f.get("altitude") is not None:
+            properties["altitude"] = f["altitude"]
+        if f.get("wikidata_id"):
+            properties["wikidata_id"] = f["wikidata_id"]
 
         geo_features.append(
             {
@@ -69,6 +73,7 @@ def _save_features_to_db(features: list[dict[str, Any]]) -> int:
             geometry_type=f.get("geometry_type", "point"),
             coordinates=f.get("coordinates", []),
             altitude=f.get("altitude"),
+            wikidata_id=f.get("wikidata_id", ""),
         )
         saved += 1
     return saved
@@ -131,6 +136,14 @@ TOOL_DEFINITIONS: list[dict[str, Any]] = [
                                     "trail, transit_route, water, parking, "
                                     "viewpoint, station, etc."
                                 ),
+                            },
+                            "altitude": {
+                                "type": "number",
+                                "description": "Altitude/elevation in metres above sea level.",
+                            },
+                            "wikidata_id": {
+                                "type": "string",
+                                "description": "Wikidata entity ID (e.g. 'Q90') for the feature.",
                             },
                         },
                         "required": [

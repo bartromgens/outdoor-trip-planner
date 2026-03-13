@@ -205,6 +205,18 @@ def get_place_coordinates(places: list[str]) -> str:
     return json.dumps({"results": results}, ensure_ascii=False)
 
 
+def find_place_info(name: str) -> dict[str, Any] | None:
+    result = json.loads(get_place_coordinates([name]))
+    results = result.get("results", [])
+    if not results:
+        return None
+    first = results[0]
+    return {
+        "wikidata_id": first.get("wikidata_id", ""),
+        "elevation_m": first.get("elevation_m"),
+    }
+
+
 TOOL_DEFINITIONS: list[dict[str, Any]] = [
     {
         "name": "get_place_coordinates",

@@ -1,1 +1,10 @@
-<div id="map"></div>
+<div id="map" [class.map--adding]="addingLocation"></div>
+<div class="map-controls">
+  <button
+    mat-raised-button
+    [color]="addingLocation ? 'warn' : 'primary'"
+    (click)="toggleAddLocation()"
+  >
+    {{ addingLocation ? 'Cancel' : '+ Add location' }}
+  </button>
+</div>

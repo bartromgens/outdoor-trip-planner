@@ -2,11 +2,30 @@
   display: block;
   height: 100%;
   width: 100%;
+  position: relative;
 }
 
 #map {
   height: 100%;
   width: 100%;
+}
+
+.map-controls {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  pointer-events: none;
+
+  button {
+    pointer-events: all;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  }
+}
+
+#map.map--adding {
+  cursor: crosshair;
 }
 
 /* Popup save button – rendered in Leaflet DOM outside Angular */

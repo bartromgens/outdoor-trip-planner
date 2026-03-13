@@ -9,6 +9,7 @@ export interface SavedLocation {
   latitude: number;
   longitude: number;
   altitude: number | null;
+  wikidata_id: string;
   description: string;
   category: string;
   geometry_type: string;
@@ -42,6 +43,7 @@ function savedLocationToFeature(loc: SavedLocation): GeoJSON.Feature | null {
       description: loc.description,
       category: loc.category,
       altitude: loc.altitude,
+      wikidata_id: loc.wikidata_id || null,
       saved: true,
     },
   };
@@ -61,6 +63,7 @@ interface LocationPayload {
   latitude: number;
   longitude: number;
   altitude: number | null;
+  wikidata_id: string;
   description: string;
   category: string;
   geometry_type: string;
@@ -107,6 +110,27 @@ export class LocationService {
     return firstValueFrom(this.http.get<SavedLocation[]>('/api/locations/'));
   }
 
+  async savePoint(
+    lat: number,
+    lng: number,
+    name: string,
+    category: string,
+    description: string,
+  ): Promise<SavedLocation> {
+    const payload: LocationPayload = {
+      name,
+      latitude: lat,
+      longitude: lng,
+      altitude: null,
+      wikidata_id: '',
+      description,
+      category,
+      geometry_type: 'point',
+      coordinates: [lng, lat],
+    };
+    return firstValueFrom(this.http.post<SavedLocation>('/api/locations/', payload));
+  }
+
   async saveFromFeature(feature: GeoJSON.Feature): Promise<SavedLocation> {
     const props = feature.properties || {};
     const extracted = extractCoords(feature);
@@ -119,6 +143,7 @@ export class LocationService {
       latitude: extracted.lat,
       longitude: extracted.lon,
       altitude: props['altitude'] ?? null,
+      wikidata_id: props['wikidata_id'] || '',
       description: props['description'] || '',
       category: props['category'] || '',
       geometry_type: geoJsonTypeToModel(feature.geometry?.type ?? ''),

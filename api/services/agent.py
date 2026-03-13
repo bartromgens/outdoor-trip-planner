@@ -36,7 +36,8 @@ interactive map.
 always call `show_on_map` so the user can see them visually.
 - For towns, villages, or other named places, use `get_place_coordinates` \
 with a list of place names to get accurate coordinates and elevation from \
-Wikidata. Then pass the results to `show_on_map` as point features.
+Wikidata. Then pass the results to `show_on_map` as point features, including \
+the `wikidata_id` and `altitude` (from `elevation_m`) fields when available.
 """
 
 
