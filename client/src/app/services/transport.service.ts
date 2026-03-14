@@ -15,8 +15,10 @@ export interface ReachabilityResult {
   features: GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>[];
 }
 
-const SLOTS_PER_HOUR = 6;
-const SLOT_INTERVAL_MS = (60 / SLOTS_PER_HOUR) * 60 * 1000;
+const WINDOW_MINUTES = 90;
+const INTERVAL_MINUTES = 10;
+const NUM_SLOTS = WINDOW_MINUTES / INTERVAL_MINUTES;
+const SLOT_INTERVAL_MS = INTERVAL_MINUTES * 60 * 1000;
 
 function toIsoUtc(d: Date): string {
   return d.toISOString().replace(/\.\d+Z$/, 'Z');
@@ -55,7 +57,7 @@ export class TransportService {
     startTime: Date,
     maxTravelTime = 60,
   ): Promise<ReachabilityResult> {
-    const times = Array.from({ length: SLOTS_PER_HOUR }, (_, i) =>
+    const times = Array.from({ length: NUM_SLOTS }, (_, i) =>
       toIsoUtc(new Date(startTime.getTime() + i * SLOT_INTERVAL_MS)),
     );
 

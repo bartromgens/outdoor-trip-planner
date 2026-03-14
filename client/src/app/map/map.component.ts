@@ -164,7 +164,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   get reachabilityLoadingText(): string {
     return this.tripDateTime.departureTime()
-      ? 'Optimizing reachability (6 slots)\u2026'
+      ? 'Optimizing reachability (9 slots)\u2026'
       : 'Loading reachability\u2026';
   }
 
@@ -261,7 +261,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     const { lat, lng } = e.latlng;
     const departure = this.tripDateTime.departureTime();
     const departureHint = departure
-      ? `<div style="font-size:11px;opacity:.65;margin-bottom:6px">6 slots from ${formatDepartureTime(departure.toISOString())}</div>`
+      ? `<div style="font-size:11px;opacity:.65;margin-bottom:6px">9 slots (10 min intervals, 1.5 h) from ${formatDepartureTime(departure.toISOString())}</div>`
       : '';
     const popup = L.popup({ closeButton: true, minWidth: 180 })
       .setLatLng(e.latlng)
