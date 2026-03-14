@@ -1,7 +1,28 @@
+import uuid as uuid_module
+
 from django.db import models
 
 
+class Map(models.Model):
+    uuid = models.UUIDField(default=uuid_module.uuid4, unique=True, db_index=True)
+    name = models.CharField(max_length=255, default="My Trip")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class HikeRoute(models.Model):
+    map = models.ForeignKey(
+        Map,
+        on_delete=models.CASCADE,
+        related_name="hike_routes",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(max_length=255)
     waypoints = models.JSONField(help_text="[[lon, lat], ...] user control points")
     geometry = models.JSONField(
@@ -26,6 +47,13 @@ class Location(models.Model):
         ("polygon", "Polygon"),
     ]
 
+    map = models.ForeignKey(
+        Map,
+        on_delete=models.CASCADE,
+        related_name="locations",
+        null=True,
+        blank=True,
+    )
     name = models.CharField(max_length=255)
     latitude = models.FloatField()
     longitude = models.FloatField()
@@ -44,7 +72,7 @@ class Location(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
-        unique_together = [("name", "latitude", "longitude")]
+        unique_together = [("map", "name", "latitude", "longitude")]
 
     def __str__(self) -> str:
         return self.name

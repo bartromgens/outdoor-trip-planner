@@ -106,11 +106,12 @@ function extractCoords(
 export class LocationService {
   constructor(private http: HttpClient) {}
 
-  async getAll(): Promise<SavedLocation[]> {
-    return firstValueFrom(this.http.get<SavedLocation[]>('/api/locations/'));
+  async getAll(mapUuid: string): Promise<SavedLocation[]> {
+    return firstValueFrom(this.http.get<SavedLocation[]>(`/api/maps/${mapUuid}/locations/`));
   }
 
   async savePoint(
+    mapUuid: string,
     lat: number,
     lng: number,
     name: string,
@@ -128,10 +129,12 @@ export class LocationService {
       geometry_type: 'point',
       coordinates: [lng, lat],
     };
-    return firstValueFrom(this.http.post<SavedLocation>('/api/locations/', payload));
+    return firstValueFrom(
+      this.http.post<SavedLocation>(`/api/maps/${mapUuid}/locations/`, payload),
+    );
   }
 
-  async saveFromFeature(feature: GeoJSON.Feature): Promise<SavedLocation> {
+  async saveFromFeature(mapUuid: string, feature: GeoJSON.Feature): Promise<SavedLocation> {
     const props = feature.properties || {};
     const extracted = extractCoords(feature);
     if (!extracted) {
@@ -150,6 +153,8 @@ export class LocationService {
       coordinates: extracted.coordinates,
     };
 
-    return firstValueFrom(this.http.post<SavedLocation>('/api/locations/', payload));
+    return firstValueFrom(
+      this.http.post<SavedLocation>(`/api/maps/${mapUuid}/locations/`, payload),
+    );
   }
 }

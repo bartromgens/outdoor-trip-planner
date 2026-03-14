@@ -18,6 +18,47 @@
     <span class="map-loading-overlay__text">Loading hike route&hellip;</span>
   </div>
 }
+
+<div class="map-selector">
+  <button mat-raised-button [matMenuTriggerFor]="mapsMenu" class="map-selector__trigger">
+    <span class="map-selector__name">{{ currentMapName }}</span>
+    <span class="map-selector__arrow">&#9662;</span>
+  </button>
+  <mat-menu #mapsMenu="matMenu" class="maps-menu">
+    <div class="maps-menu__header" (click)="$event.stopPropagation()">
+      @if (!editingMapName) {
+        <span class="maps-menu__title">{{ currentMapName }}</span>
+        <button class="maps-menu__rename-btn" (click)="startEditMapName()">Rename</button>
+      } @else {
+        <input
+          class="maps-menu__rename-input"
+          [(ngModel)]="mapNameInput"
+          (keydown.enter)="saveMapName()"
+          (keydown.escape)="cancelEditMapName()"
+          (click)="$event.stopPropagation()"
+          autofocus
+        />
+        <button class="maps-menu__rename-btn maps-menu__rename-btn--save" (click)="saveMapName()">
+          Save
+        </button>
+      }
+    </div>
+    <div class="maps-menu__divider"></div>
+    @for (map of myMaps(); track map.uuid) {
+      <button
+        mat-menu-item
+        (click)="switchToMap(map.uuid)"
+        [class.maps-menu__item--active]="map.uuid === currentMapUuid"
+      >
+        {{ map.name }}
+      </button>
+    }
+    <div class="maps-menu__divider"></div>
+    <button mat-menu-item (click)="createNewMap()">+ New map</button>
+    <button mat-menu-item (click)="copyShareLink()">&#128279; Copy share link</button>
+  </mat-menu>
+</div>
+
 <div class="map-controls">
   <button
     mat-raised-button

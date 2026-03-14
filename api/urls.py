@@ -14,4 +14,23 @@ urlpatterns = [
     path("hike-directions/", views.hike_directions, name="hike-directions"),
     path("hike-routes/", views.hike_routes, name="hike-routes"),
     path("hike-routes/<int:pk>/", views.hike_route_detail, name="hike-route-detail"),
+    # Map-scoped endpoints
+    path("maps/", views.maps, name="maps"),
+    path("maps/<uuid:uuid>/", views.map_detail, name="map-detail"),
+    path("maps/<uuid:uuid>/locations/", views.map_locations, name="map-locations"),
+    path(
+        "maps/<uuid:uuid>/locations/<int:pk>/",
+        views.map_location_detail,
+        name="map-location-detail",
+    ),
+    path(
+        "maps/<uuid:uuid>/hike-routes/",
+        views.map_hike_routes,
+        name="map-hike-routes",
+    ),
+    path(
+        "maps/<uuid:uuid>/hike-routes/<int:pk>/",
+        views.map_hike_route_detail,
+        name="map-hike-route-detail",
+    ),
 ]

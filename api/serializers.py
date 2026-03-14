@@ -1,6 +1,15 @@
 from rest_framework import serializers
 
-from .models import HikeRoute, Location
+from .models import HikeRoute, Location, Map
+
+
+class MapSerializer(serializers.ModelSerializer):
+    uuid = serializers.UUIDField(required=False)
+
+    class Meta:
+        model = Map
+        fields = ["uuid", "name", "created_at"]
+        read_only_fields = ["created_at"]
 
 
 class HikeRouteSerializer(serializers.ModelSerializer):

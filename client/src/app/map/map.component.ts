@@ -2,16 +2,22 @@ import {
   Component,
   AfterViewInit,
   OnDestroy,
+  OnInit,
   inject,
   NgZone,
   ChangeDetectorRef,
   effect,
+  signal,
+  computed,
 } from '@angular/core';
+import { ActivatedRoute, Router } from '@angular/router';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
+import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
+import { FormsModule } from '@angular/forms';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
 import {
@@ -21,6 +27,7 @@ import {
   type ReachabilityStop,
 } from '../services/transport.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
+import { MapManagerService } from '../services/map-manager.service';
 import type { BoundingBox } from '../services/chat.service';
 import { environment } from '../../environments/environment';
 import {
@@ -44,12 +51,11 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const DEFAULT_COLOR = '#1976d2';
 
-const BUCKET_COLORS: Record<number, string> = {
-  15: '#2e7d32',
-  30: '#f9a825',
-  45: '#e65100',
-  60: '#b71c1c',
-};
+function reachabilityColor(bucketMinutes: number): string {
+  const t = Math.min(1, Math.max(0, (bucketMinutes - 15) / 45));
+  const lightness = Math.round(62 - t * 38);
+  return `hsl(122, 62%, ${lightness}%)`;
+}
 
 interface IsochroneBucket {
   seconds: number;
@@ -90,19 +96,19 @@ function colorForCategory(category?: string): string {
 }
 
 function reachabilityIcon(bucket: number): L.DivIcon {
-  const color = BUCKET_COLORS[bucket] ?? '#757575';
+  const color = reachabilityColor(bucket);
   return L.divIcon({
     className: 'map-marker',
     html: `<div style="
       background:${color};
-      width:8px;height:8px;
+      width:13px;height:13px;
       border-radius:50%;
-      border:1.5px solid rgba(255,255,255,0.8);
-      box-shadow:0 1px 3px rgba(0,0,0,.4);
+      border:2px solid rgba(255,255,255,0.85);
+      box-shadow:0 1px 4px rgba(0,0,0,.45);
     "></div>`,
-    iconSize: [11, 11],
-    iconAnchor: [5, 5],
-    popupAnchor: [0, -7],
+    iconSize: [17, 17],
+    iconAnchor: [8, 8],
+    popupAnchor: [0, -10],
   });
 }
 
@@ -200,15 +206,21 @@ function formatDepartureTime(isoUtc: string): string {
   return new Date(isoUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 }
 
-function buildTransportLayer(): L.TileLayer {
+const THUNDERFOREST_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://www.thunderforest.com/">Thunderforest</a>';
+
+function buildThunderforestLayer(style: string): L.TileLayer | null {
   const key = environment.thunderforestApiKey;
-  if (key) {
-    return L.tileLayer(`https://tile.thunderforest.com/transport/{z}/{x}/{y}.png?apikey=${key}`, {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://www.thunderforest.com/">Thunderforest</a>',
-      maxZoom: 22,
-    });
-  }
+  if (!key) return null;
+  return L.tileLayer(`https://tile.thunderforest.com/${style}/{z}/{x}/{y}.png?apikey=${key}`, {
+    attribution: THUNDERFOREST_ATTRIBUTION,
+    maxZoom: 22,
+  });
+}
+
+function buildTransportLayer(): L.TileLayer {
+  const layer = buildThunderforestLayer('transport');
+  if (layer) return layer;
   return L.tileLayer('https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png', {
     attribution:
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://memomaps.de/">memomaps</a>',
@@ -219,14 +231,17 @@ function buildTransportLayer(): L.TileLayer {
   selector: 'app-map',
   templateUrl: './map.component.html',
   styleUrl: './map.component.scss',
-  imports: [MatButtonModule],
+  imports: [MatButtonModule, MatMenuModule, FormsModule],
 })
-export class MapComponent implements AfterViewInit, OnDestroy {
+export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private chatService = inject(ChatService);
   private locationService = inject(LocationService);
   private transportService = inject(TransportService);
   private hikeRouteService = inject(HikeRouteService);
   private tripDateTime = inject(TripDateTimeService);
+  private mapManager = inject(MapManagerService);
+  private route = inject(ActivatedRoute);
+  private router = inject(Router);
   private dialog = inject(MatDialog);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
@@ -259,11 +274,46 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private lastHikeDirectionsResult: HikeDirectionsResult | null = null;
   private savedHikesLayer?: L.LayerGroup;
 
+  currentMapUuid = '';
+  mapSelectorOpen = false;
+  editingMapName = false;
+  mapNameInput = '';
+  readonly myMaps = computed(() => this.mapManager.myMaps());
+  get currentMapName(): string {
+    return this.mapManager.getMapName(this.currentMapUuid);
+  }
+
   constructor() {
     effect(() => {
       this.tripDateTime.departureTime();
       if (this.mapReady) this.debouncedSyncUrl();
     });
+  }
+
+  async ngOnInit(): Promise<void> {
+    let uuid = this.route.snapshot.params['uuid'] as string;
+
+    if (uuid === 'new') {
+      const newUuid = await this.mapManager.createMap({ name: 'My Trip' });
+      this.router.navigate(['/map', newUuid], { replaceUrl: true });
+      return;
+    }
+
+    this.currentMapUuid = uuid;
+    this.chatService.setMapUuid(uuid);
+
+    const mapInfo = await this.mapManager.fetchMap(uuid);
+    if (mapInfo) {
+      if (!this.mapManager.isMyMap(uuid)) {
+        this.mapManager.addToMyMaps(uuid, mapInfo.name);
+      }
+    } else {
+      await this.mapManager.createMap({ uuid, name: 'My Trip' });
+    }
+    this.cdr.detectChanges();
+
+    this.loadSavedLocations();
+    this.loadSavedHikes();
   }
 
   get reachabilityLoadingText(): string {
@@ -296,10 +346,15 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       },
     );
 
+    const landscapeLayer = buildThunderforestLayer('landscape');
+    const outdoorsLayer = buildThunderforestLayer('outdoors');
+
     const baseLayerConfig: Record<string, L.Layer> = {
       Standard: osmLayer,
       Transport: transportLayer,
       Satellite: satelliteLayer,
+      ...(landscapeLayer && { Landscape: landscapeLayer }),
+      ...(outdoorsLayer && { Outdoors: outdoorsLayer }),
     };
     for (const [name, layer] of Object.entries(baseLayerConfig)) {
       this.baseLayers.set(name, layer);
@@ -343,8 +398,6 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       this.renderFeatures(fc);
     });
 
-    this.loadSavedLocations();
-    this.loadSavedHikes();
     this.loadContourLayers();
     this.mapReady = true;
   }
@@ -430,7 +483,14 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       ref.afterClosed().subscribe((result: AddLocationDialogResult | undefined) => {
         if (!result) return;
         this.locationService
-          .savePoint(lat, lng, result.name, result.category, result.description)
+          .savePoint(
+            this.currentMapUuid,
+            lat,
+            lng,
+            result.name,
+            result.category,
+            result.description,
+          )
           .then(() => this.loadSavedLocations())
           .catch((err) => console.error('Failed to save location', err));
       });
@@ -773,9 +833,9 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
     try {
       if (isUpdate && this.editingRouteId) {
-        await this.hikeRouteService.update(this.editingRouteId, payload);
+        await this.hikeRouteService.update(this.currentMapUuid, this.editingRouteId, payload);
       } else {
-        const saved = await this.hikeRouteService.create(payload);
+        const saved = await this.hikeRouteService.create(this.currentMapUuid, payload);
         this.editingRouteId = saved.id;
       }
       await this.loadSavedHikes();
@@ -786,7 +846,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   async deleteHikeRoute(id: number): Promise<void> {
     try {
-      await this.hikeRouteService.delete(id);
+      await this.hikeRouteService.delete(this.currentMapUuid, id);
       if (this.editingRouteId === id) {
         this.clearHikeRoute();
         this.hikePlanningActive = false;
@@ -817,7 +877,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   private async loadSavedHikes(): Promise<void> {
     try {
-      const routes = await this.hikeRouteService.getAll();
+      const routes = await this.hikeRouteService.getAll(this.currentMapUuid);
 
       if (this.savedHikesLayer) {
         this.layerControl.removeLayer(this.savedHikesLayer);
@@ -874,6 +934,39 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     }
   }
 
+  switchToMap(uuid: string): void {
+    this.router.navigate(['/map', uuid]);
+  }
+
+  async createNewMap(): Promise<void> {
+    await this.mapManager.navigateToNewMap();
+  }
+
+  startEditMapName(): void {
+    this.mapNameInput = this.currentMapName;
+    this.editingMapName = true;
+    this.cdr.detectChanges();
+  }
+
+  async saveMapName(): Promise<void> {
+    const trimmed = this.mapNameInput.trim();
+    if (trimmed && trimmed !== this.currentMapName) {
+      await this.mapManager.renameMap(this.currentMapUuid, trimmed);
+      this.cdr.detectChanges();
+    }
+    this.editingMapName = false;
+  }
+
+  cancelEditMapName(): void {
+    this.editingMapName = false;
+  }
+
+  copyShareLink(): void {
+    navigator.clipboard.writeText(window.location.href).catch(() => {
+      prompt('Copy this link to share the map:', window.location.href);
+    });
+  }
+
   ngOnDestroy(): void {
     this.subscription?.unsubscribe();
     if (this.syncUrlTimer) clearTimeout(this.syncUrlTimer);
@@ -885,7 +978,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   private async loadSavedLocations(): Promise<void> {
     try {
-      const locations = await this.locationService.getAll();
+      const locations = await this.locationService.getAll(this.currentMapUuid);
       const fc = savedLocationsToFeatureCollection(locations);
       if (this.savedLayer) {
         this.map.removeLayer(this.savedLayer);
@@ -951,7 +1044,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     btn.disabled = true;
     btn.textContent = 'Saving…';
     this.locationService
-      .saveFromFeature(feature)
+      .saveFromFeature(this.currentMapUuid, feature)
       .then(() => {
         btn.textContent = 'Saved';
         btn.classList.add('popup-save-btn--saved');

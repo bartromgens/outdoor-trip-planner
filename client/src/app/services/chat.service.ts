@@ -49,6 +49,7 @@ export class ChatService {
   private apiMessages: ChatMessage[] = [];
   private abortController: AbortController | null = null;
   private currentBbox: BoundingBox | null = null;
+  private currentMapUuid: string | null = null;
 
   readonly displayMessages$ = new BehaviorSubject<DisplayMessage[]>([]);
   readonly mapFeatures$ = new BehaviorSubject<GeoJSON.FeatureCollection | null>(null);
@@ -57,6 +58,10 @@ export class ChatService {
 
   setBbox(bbox: BoundingBox): void {
     this.currentBbox = bbox;
+  }
+
+  setMapUuid(uuid: string): void {
+    this.currentMapUuid = uuid;
   }
 
   stop(): void {
@@ -90,6 +95,9 @@ export class ChatService {
       const body: Record<string, unknown> = { messages: this.apiMessages };
       if (this.currentBbox) {
         body['bbox'] = this.currentBbox;
+      }
+      if (this.currentMapUuid) {
+        body['map_uuid'] = this.currentMapUuid;
       }
 
       const response = await fetch('/api/chat/stream/', {
@@ -158,5 +166,6 @@ export class ChatService {
     this.displayMessages$.next([]);
     this.mapFeatures$.next(null);
     this.toolActivity$.next(null);
+    this.currentMapUuid = null;
   }
 }

@@ -25,19 +25,23 @@ interface HikeRoutePayload {
 export class HikeRouteService {
   constructor(private http: HttpClient) {}
 
-  getAll(): Promise<SavedHikeRoute[]> {
-    return firstValueFrom(this.http.get<SavedHikeRoute[]>('/api/hike-routes/'));
+  getAll(mapUuid: string): Promise<SavedHikeRoute[]> {
+    return firstValueFrom(this.http.get<SavedHikeRoute[]>(`/api/maps/${mapUuid}/hike-routes/`));
   }
 
-  create(payload: HikeRoutePayload): Promise<SavedHikeRoute> {
-    return firstValueFrom(this.http.post<SavedHikeRoute>('/api/hike-routes/', payload));
+  create(mapUuid: string, payload: HikeRoutePayload): Promise<SavedHikeRoute> {
+    return firstValueFrom(
+      this.http.post<SavedHikeRoute>(`/api/maps/${mapUuid}/hike-routes/`, payload),
+    );
   }
 
-  update(id: number, payload: Partial<HikeRoutePayload>): Promise<SavedHikeRoute> {
-    return firstValueFrom(this.http.put<SavedHikeRoute>(`/api/hike-routes/${id}/`, payload));
+  update(mapUuid: string, id: number, payload: Partial<HikeRoutePayload>): Promise<SavedHikeRoute> {
+    return firstValueFrom(
+      this.http.put<SavedHikeRoute>(`/api/maps/${mapUuid}/hike-routes/${id}/`, payload),
+    );
   }
 
-  delete(id: number): Promise<void> {
-    return firstValueFrom(this.http.delete<void>(`/api/hike-routes/${id}/`));
+  delete(mapUuid: string, id: number): Promise<void> {
+    return firstValueFrom(this.http.delete<void>(`/api/maps/${mapUuid}/hike-routes/${id}/`));
   }
 }

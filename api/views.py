@@ -2,6 +2,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any
+from uuid import UUID
 
 import httpx
 from django.http import FileResponse, HttpRequest, HttpResponse, StreamingHttpResponse
@@ -14,8 +15,8 @@ from rest_framework.response import Response
 
 from django.conf import settings
 
-from .models import HikeRoute, Location
-from .serializers import HikeRouteSerializer, LocationSerializer
+from .models import HikeRoute, Location, Map
+from .serializers import HikeRouteSerializer, LocationSerializer, MapSerializer
 from .services.agent import run_agent, stream_agent_events
 from .services.tools.transport import HEADERS, TIMEOUT, TRANSITOUS_BASE
 from .services.tools.wikidata import find_place_info
@@ -24,6 +25,15 @@ logger = logging.getLogger(__name__)
 
 CONTOURS_DIR = Path(__file__).resolve().parent / "static" / "contours"
 VALID_CONTOUR_LEVELS = {1500, 1750, 2000, 2500, 3000}
+
+
+def _get_map_or_404(uuid: UUID) -> Map:
+    try:
+        return Map.objects.get(uuid=uuid)
+    except Map.DoesNotExist:
+        from rest_framework.exceptions import NotFound
+
+        raise NotFound("Map not found")
 
 
 @api_view(["GET"])
@@ -383,6 +393,141 @@ def hike_directions(request: Request) -> Response:
         )
 
     return Response(resp.json())
+
+
+@api_view(["POST"])
+def maps(request: Request) -> Response:
+    serializer = MapSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    obj = serializer.save()
+    return Response(MapSerializer(obj).data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PATCH"])
+def map_detail(request: Request, uuid: UUID) -> Response:
+    map_obj = _get_map_or_404(uuid)
+    if request.method == "GET":
+        return Response(MapSerializer(map_obj).data)
+    serializer = MapSerializer(map_obj, data=request.data, partial=True)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(MapSerializer(map_obj).data)
+
+
+@api_view(["GET", "POST"])
+def map_locations(request: Request, uuid: UUID) -> Response:
+    map_obj = _get_map_or_404(uuid)
+
+    if request.method == "GET":
+        qs = Location.objects.filter(map=map_obj)
+        category = request.query_params.get("category")
+        if category:
+            qs = qs.filter(category=category)
+        return Response(LocationSerializer(qs, many=True).data)
+
+    try:
+        existing = Location.objects.filter(
+            map=map_obj,
+            name=request.data.get("name"),
+            latitude=float(request.data.get("latitude", 0)),
+            longitude=float(request.data.get("longitude", 0)),
+        ).first()
+        if existing:
+            return Response(
+                LocationSerializer(existing).data, status=status.HTTP_200_OK
+            )
+    except (TypeError, ValueError):
+        pass
+
+    serializer = LocationSerializer(data=request.data)
+    if not serializer.is_valid():
+        logger.warning(
+            "Location save rejected  errors=%s  data=%s",
+            serializer.errors,
+            request.data,
+        )
+        raise serializers.ValidationError(serializer.errors)
+
+    extra: dict = {}
+    if not serializer.validated_data.get("wikidata_id"):
+        try:
+            info = find_place_info(serializer.validated_data["name"])
+            if info:
+                if info["wikidata_id"]:
+                    extra["wikidata_id"] = info["wikidata_id"]
+                if info[
+                    "elevation_m"
+                ] is not None and not serializer.validated_data.get("altitude"):
+                    extra["altitude"] = info["elevation_m"]
+        except Exception:
+            logger.warning(
+                "Wikidata enrichment failed for %r", serializer.validated_data["name"]
+            )
+
+    serializer.save(map=map_obj, **extra)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "DELETE"])
+def map_location_detail(request: Request, uuid: UUID, pk: int) -> Response:
+    map_obj = _get_map_or_404(uuid)
+    try:
+        loc = Location.objects.get(pk=pk, map=map_obj)
+    except Location.DoesNotExist:
+        return Response(
+            {"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == "GET":
+        return Response(LocationSerializer(loc).data)
+
+    if request.method == "PUT":
+        serializer = LocationSerializer(loc, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    loc.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET", "POST"])
+def map_hike_routes(request: Request, uuid: UUID) -> Response:
+    map_obj = _get_map_or_404(uuid)
+
+    if request.method == "GET":
+        serializer = HikeRouteSerializer(
+            HikeRoute.objects.filter(map=map_obj), many=True
+        )
+        return Response(serializer.data)
+
+    serializer = HikeRouteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save(map=map_obj)
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "DELETE"])
+def map_hike_route_detail(request: Request, uuid: UUID, pk: int) -> Response:
+    map_obj = _get_map_or_404(uuid)
+    try:
+        route = HikeRoute.objects.get(pk=pk, map=map_obj)
+    except HikeRoute.DoesNotExist:
+        return Response(
+            {"error": "Hike route not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == "GET":
+        return Response(HikeRouteSerializer(route).data)
+
+    if request.method == "PUT":
+        serializer = HikeRouteSerializer(route, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    route.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @csrf_exempt
