@@ -17,6 +17,9 @@
   transform: translateX(-50%);
   z-index: 1000;
   pointer-events: none;
+  display: flex;
+  gap: 8px;
+  align-items: center;
 
   button {
     pointer-events: all;
@@ -24,7 +27,8 @@
   }
 }
 
-#map.map--adding {
+#map.map--adding,
+#map.map--hike-planning {
   cursor: crosshair;
 }
 
@@ -76,6 +80,37 @@
 
   &:hover {
     background: #1b5e20;
+  }
+}
+
+/* Saved hike popup buttons – rendered in Leaflet DOM outside Angular */
+:host ::ng-deep .hike-edit-btn {
+  background: #00695c;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  flex: 1;
+
+  &:hover {
+    background: #004d40;
+  }
+}
+
+:host ::ng-deep .hike-delete-btn {
+  background: #c62828;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  flex: 1;
+
+  &:hover {
+    background: #b71c1c;
   }
 }
 

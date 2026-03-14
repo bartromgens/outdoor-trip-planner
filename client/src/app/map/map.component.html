@@ -1,4 +1,8 @@
-<div id="map" [class.map--adding]="addingLocation"></div>
+<div
+  id="map"
+  [class.map--adding]="addingLocation"
+  [class.map--hike-planning]="hikePlanningActive"
+></div>
 @if (reachabilityLoading) {
   <div class="map-loading-overlay">
     <span class="map-loading-overlay__text">{{ reachabilityLoadingText }}</span>
@@ -9,6 +13,11 @@
     <span class="map-loading-overlay__text">Loading hike isochrones&hellip;</span>
   </div>
 }
+@if (hikeLoading) {
+  <div class="map-loading-overlay">
+    <span class="map-loading-overlay__text">Loading hike route&hellip;</span>
+  </div>
+}
 <div class="map-controls">
   <button
     mat-raised-button
@@ -17,4 +26,24 @@
   >
     {{ addingLocation ? 'Cancel' : '+ Add location' }}
   </button>
+  <button
+    mat-raised-button
+    [color]="hikePlanningActive ? 'warn' : 'primary'"
+    (click)="toggleHikePlanning()"
+  >
+    {{ hikePlanningActive ? 'Stop planning' : 'Plan hike' }}
+  </button>
+  @if (hikePlanningActive) {
+    <button mat-raised-button (click)="clearHikeRoute()">Clear route</button>
+  }
+  @if (hikePlanningActive && hikeRouteLayer && !editingRouteId) {
+    <button mat-raised-button color="accent" [disabled]="hikeLoading" (click)="saveHikeRoute()">
+      Save route
+    </button>
+  }
+  @if (hikePlanningActive && hikeRouteLayer && editingRouteId) {
+    <button mat-raised-button color="accent" [disabled]="hikeLoading" (click)="updateHikeRoute()">
+      Update route
+    </button>
+  }
 </div>

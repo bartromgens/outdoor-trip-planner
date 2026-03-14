@@ -1,6 +1,24 @@
 from django.db import models
 
 
+class HikeRoute(models.Model):
+    name = models.CharField(max_length=255)
+    waypoints = models.JSONField(help_text="[[lon, lat], ...] user control points")
+    geometry = models.JSONField(
+        help_text="[[lon, lat], ...] ORS LineString coordinates"
+    )
+    distance_m = models.FloatField(null=True, blank=True)
+    duration_s = models.FloatField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return self.name
+
+
 class Location(models.Model):
     GEOMETRY_TYPES = [
         ("point", "Point"),

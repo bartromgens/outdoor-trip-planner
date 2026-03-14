@@ -11,6 +11,21 @@ export interface HikeIsochroneResult {
   features: GeoJSON.Feature<GeoJSON.Polygon, HikeIsochroneProperties>[];
 }
 
+export interface HikeDirectionsSummary {
+  distance: number;
+  duration: number;
+}
+
+export interface HikeDirectionsProperties {
+  summary: HikeDirectionsSummary;
+  way_points: number[];
+}
+
+export interface HikeDirectionsResult {
+  type: 'FeatureCollection';
+  features: GeoJSON.Feature<GeoJSON.LineString, HikeDirectionsProperties>[];
+}
+
 export interface ReachabilityStop {
   name: string;
   duration_min: number;
@@ -59,6 +74,16 @@ export class TransportService {
     const resp = await fetch(`/api/reachability/?${params}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json() as Promise<ReachabilityResult>;
+  }
+
+  async getHikeDirections(coordinates: [number, number][]): Promise<HikeDirectionsResult> {
+    const resp = await fetch('/api/hike-directions/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ coordinates }),
+    });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json() as Promise<HikeDirectionsResult>;
   }
 
   async getHikeIsochrone(lat: number, lon: number): Promise<HikeIsochroneResult> {

@@ -14,8 +14,8 @@ from rest_framework.response import Response
 
 from django.conf import settings
 
-from .models import Location
-from .serializers import LocationSerializer
+from .models import HikeRoute, Location
+from .serializers import HikeRouteSerializer, LocationSerializer
 from .services.agent import run_agent, stream_agent_events
 from .services.tools.transport import HEADERS, TIMEOUT, TRANSITOUS_BASE
 from .services.tools.wikidata import find_place_info
@@ -310,6 +310,75 @@ def hike_isochrone(request: Request) -> Response:
         logger.exception("ORS isochrone API error")
         return Response(
             {"error": "Failed to fetch isochrone data"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    return Response(resp.json())
+
+
+@api_view(["GET", "POST"])
+def hike_routes(request: Request) -> Response:
+    if request.method == "GET":
+        serializer = HikeRouteSerializer(HikeRoute.objects.all(), many=True)
+        return Response(serializer.data)
+
+    serializer = HikeRouteSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    serializer.save()
+    return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(["GET", "PUT", "DELETE"])
+def hike_route_detail(request: Request, pk: int) -> Response:
+    try:
+        route = HikeRoute.objects.get(pk=pk)
+    except HikeRoute.DoesNotExist:
+        return Response(
+            {"error": "Hike route not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+
+    if request.method == "GET":
+        return Response(HikeRouteSerializer(route).data)
+
+    if request.method == "PUT":
+        serializer = HikeRouteSerializer(route, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    route.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["POST"])
+def hike_directions(request: Request) -> Response:
+    coordinates = request.data.get("coordinates")
+
+    if not isinstance(coordinates, list) or len(coordinates) < 2:
+        return Response(
+            {"error": "coordinates must be a list of at least 2 [lon, lat] pairs"},
+            status=status.HTTP_400_BAD_REQUEST,
+        )
+
+    api_key = getattr(settings, "ORS_API_KEY", "")
+    if not api_key:
+        return Response(
+            {"error": "OpenRouteService API key not configured"},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    try:
+        resp = httpx.post(
+            f"{ORS_BASE}/directions/foot-hiking/geojson",
+            headers={"Authorization": api_key, "Content-Type": "application/json"},
+            json={"coordinates": coordinates},
+            timeout=TIMEOUT,
+        )
+        resp.raise_for_status()
+    except Exception:
+        logger.exception("ORS directions API error")
+        return Response(
+            {"error": "Failed to fetch directions data"},
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
