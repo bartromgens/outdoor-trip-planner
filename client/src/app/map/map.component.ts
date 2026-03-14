@@ -63,7 +63,7 @@ interface IsochroneBucket {
   fillOpacity: number;
 }
 
-// Must match the backend ELEVATION_COMPENSATION_FACTOR in api/views.py.
+// Must match ELEVATION_COMPENSATION_FACTOR in api/services/routing.py.
 const ELEVATION_COMPENSATION_FACTOR = 1.5;
 
 const ISOCHRONE_BUCKETS: IsochroneBucket[] = [
@@ -338,6 +338,20 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.tripDateTime.departureTime()
       ? 'Optimizing reachability (9 slots)\u2026'
       : 'Loading reachability\u2026';
+  }
+
+  get hasHikingRanges(): boolean {
+    return !!this.isochroneLayer;
+  }
+
+  clearHikingRanges(): void {
+    if (!this.isochroneLayer) return;
+    this.layerControl.removeLayer(this.isochroneLayer);
+    this.map.removeLayer(this.isochroneLayer);
+    this.isochroneLayer = undefined;
+    this.activeOverlayNames.delete('Hike isochrones');
+    this.debouncedSyncUrl();
+    this.cdr.detectChanges();
   }
 
   ngAfterViewInit(): void {

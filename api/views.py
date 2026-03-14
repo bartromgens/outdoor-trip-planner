@@ -18,6 +18,7 @@ from django.conf import settings
 from .models import HikeRoute, Location, Map
 from .serializers import HikeRouteSerializer, LocationSerializer, MapSerializer
 from .services.agent import run_agent, stream_agent_events
+from .services import routing as routing_svc
 from .services.tools.transport import HEADERS, TIMEOUT, TRANSITOUS_BASE
 from .services.tools.wikidata import find_place_info
 
@@ -272,12 +273,24 @@ def reachability(request: Request) -> Response:
     )
 
 
-ORS_BASE = "https://api.openrouteservice.org/v2"
-# ORS foot-hiking uses a flat 5 km/h regardless of slope (elevation not modelled).
-# Dividing the ORS time ranges by this factor compensates for the speed overestimation
-# in mountain terrain, so the displayed labels (1h/2h/3h) reflect realistic hiking time.
-ELEVATION_COMPENSATION_FACTOR = 1.5
-ISOCHRONE_RANGES = [int(h * 3600 / ELEVATION_COMPENSATION_FACTOR) for h in [1, 2, 3]]
+def _routing_backend() -> str:
+    return getattr(settings, "ROUTING_BACKEND", "ors").lower()
+
+
+def _routing_api_key() -> str:
+    backend = _routing_backend()
+    if backend == "stadia":
+        return getattr(settings, "STADIA_API_KEY", "")
+    return getattr(settings, "ORS_API_KEY", "")
+
+
+def _routing_not_configured_error() -> Response:
+    backend = _routing_backend()
+    if backend == "stadia":
+        msg = "Stadia Maps API key not configured"
+    else:
+        msg = "OpenRouteService API key not configured"
+    return Response({"error": msg}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
 
 
 @api_view(["GET"])
@@ -297,33 +310,24 @@ def hike_isochrone(request: Request) -> Response:
             {"error": "lat and lon must be numeric"}, status=status.HTTP_400_BAD_REQUEST
         )
 
-    api_key = getattr(settings, "ORS_API_KEY", "")
+    api_key = _routing_api_key()
     if not api_key:
-        return Response(
-            {"error": "OpenRouteService API key not configured"},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
+        return _routing_not_configured_error()
 
+    backend = _routing_backend()
     try:
-        resp = httpx.post(
-            f"{ORS_BASE}/isochrones/foot-hiking",
-            headers={"Authorization": api_key, "Content-Type": "application/json"},
-            json={
-                "locations": [[lon, lat]],
-                "range": ISOCHRONE_RANGES,
-                "range_type": "time",
-            },
-            timeout=TIMEOUT,
-        )
-        resp.raise_for_status()
+        if backend == "stadia":
+            data = routing_svc.isochrone_valhalla(lat, lon, api_key)
+        else:
+            data = routing_svc.isochrone_ors(lat, lon, api_key)
     except Exception:
-        logger.exception("ORS isochrone API error")
+        logger.exception("%s isochrone API error", backend.upper())
         return Response(
             {"error": "Failed to fetch isochrone data"},
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
-    return Response(resp.json())
+    return Response(data)
 
 
 @api_view(["GET", "POST"])
@@ -370,29 +374,24 @@ def hike_directions(request: Request) -> Response:
             status=status.HTTP_400_BAD_REQUEST,
         )
 
-    api_key = getattr(settings, "ORS_API_KEY", "")
+    api_key = _routing_api_key()
     if not api_key:
-        return Response(
-            {"error": "OpenRouteService API key not configured"},
-            status=status.HTTP_503_SERVICE_UNAVAILABLE,
-        )
+        return _routing_not_configured_error()
 
+    backend = _routing_backend()
     try:
-        resp = httpx.post(
-            f"{ORS_BASE}/directions/foot-hiking/geojson",
-            headers={"Authorization": api_key, "Content-Type": "application/json"},
-            json={"coordinates": coordinates},
-            timeout=TIMEOUT,
-        )
-        resp.raise_for_status()
+        if backend == "stadia":
+            data = routing_svc.directions_valhalla(coordinates, api_key)
+        else:
+            data = routing_svc.directions_ors(coordinates, api_key)
     except Exception:
-        logger.exception("ORS directions API error")
+        logger.exception("%s directions API error", backend.upper())
         return Response(
             {"error": "Failed to fetch directions data"},
             status=status.HTTP_502_BAD_GATEWAY,
         )
 
-    return Response(resp.json())
+    return Response(data)
 
 
 @api_view(["POST"])
