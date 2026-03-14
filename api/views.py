@@ -279,15 +279,15 @@ def _routing_backend() -> str:
 
 def _routing_api_key() -> str:
     backend = _routing_backend()
-    if backend == "stadia":
-        return getattr(settings, "STADIA_API_KEY", "")
+    if backend == "valhalla":
+        return getattr(settings, "VALHALLA_API_KEY", "")
     return getattr(settings, "ORS_API_KEY", "")
 
 
 def _routing_not_configured_error() -> Response:
     backend = _routing_backend()
-    if backend == "stadia":
-        msg = "Stadia Maps API key not configured"
+    if backend == "valhalla":
+        msg = "Valhalla API key not configured"
     else:
         msg = "OpenRouteService API key not configured"
     return Response({"error": msg}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
@@ -316,7 +316,7 @@ def hike_isochrone(request: Request) -> Response:
 
     backend = _routing_backend()
     try:
-        if backend == "stadia":
+        if backend == "valhalla":
             data = routing_svc.isochrone_valhalla(lat, lon, api_key)
         else:
             data = routing_svc.isochrone_ors(lat, lon, api_key)
@@ -380,7 +380,7 @@ def hike_directions(request: Request) -> Response:
 
     backend = _routing_backend()
     try:
-        if backend == "stadia":
+        if backend == "valhalla":
             data = routing_svc.directions_valhalla(coordinates, api_key)
         else:
             data = routing_svc.directions_ors(coordinates, api_key)

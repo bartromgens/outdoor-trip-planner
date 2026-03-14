@@ -165,8 +165,8 @@
 
 .input-row {
   display: flex;
-  align-items: flex-end;
-  gap: 4px;
+  align-items: center;
+  gap: 8px;
 }
 
 .input-field {
@@ -174,5 +174,17 @@
 
   textarea {
     resize: none;
+  }
+}
+
+.input-row button {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+
+  .mat-icon {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
   }
 }

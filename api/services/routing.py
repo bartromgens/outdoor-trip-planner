@@ -8,12 +8,12 @@ logger = logging.getLogger(__name__)
 TIMEOUT = 15.0
 
 ORS_BASE = "https://api.openrouteservice.org/v2"
-STADIA_BASE = "https://api.stadiamaps.com"
+VALHALLA_BASE = "https://api.stadiamaps.com"
 
 # ORS foot-hiking uses a flat 5 km/h regardless of slope (elevation not modelled).
 # Dividing the requested time ranges by this factor compensates for the speed
 # overestimation in mountain terrain so displayed labels (1h/2h/3h) reflect
-# realistic hiking time.  Valhalla (Stadia) already accounts for elevation, so
+# realistic hiking time.  Valhalla already accounts for elevation, so
 # no compensation is needed there.
 ELEVATION_COMPENSATION_FACTOR = 1.5
 
@@ -23,10 +23,16 @@ _ISOCHRONE_HOURS = [1, 2, 3]
 ORS_ISOCHRONE_RANGES = [
     int(h * 3600 / ELEVATION_COMPENSATION_FACTOR) for h in _ISOCHRONE_HOURS
 ]
-# Stadia/Valhalla: request realistic hiking hours directly.
+# Valhalla: request realistic hiking hours directly.
 # The Valhalla pedestrian isochrone is capped at 120 minutes, so the 3 h
 # contour is omitted for this backend.
-STADIA_ISOCHRONE_CONTOURS = [h * 60 for h in _ISOCHRONE_HOURS if h * 60 <= 120]
+VALHALLA_ISOCHRONE_CONTOURS = [h * 60 for h in _ISOCHRONE_HOURS if h * 60 <= 120]
+
+VALHALLA_PEDESTRIAN_OPTIONS = {
+    "max_hiking_difficulty": 4,
+    "use_tracks": 1.0,
+    "use_hills": 1.0,
+}
 
 
 def _decode_polyline6(encoded: str) -> list[tuple[float, float]]:
@@ -86,24 +92,27 @@ def isochrone_ors(lat: float, lon: float, api_key: str) -> dict[str, Any]:
 
 def isochrone_valhalla(lat: float, lon: float, api_key: str) -> dict[str, Any]:
     logger.info(
-        "ROUTING_BACKEND_REQUEST backend=stadia endpoint=isochrone lat=%s lon=%s",
+        "ROUTING_BACKEND_REQUEST backend=valhalla endpoint=isochrone lat=%s lon=%s",
         lat,
         lon,
     )
-    contours = [{"time": m} for m in STADIA_ISOCHRONE_CONTOURS]
+    contours = [{"time": m} for m in VALHALLA_ISOCHRONE_CONTOURS]
     resp = httpx.post(
-        f"{STADIA_BASE}/isochrone/v1",
+        f"{VALHALLA_BASE}/isochrone/v1",
         params={"api_key": api_key},
         json={
             "locations": [{"lat": lat, "lon": lon}],
             "costing": "pedestrian",
+            "costing_options": {"pedestrian": VALHALLA_PEDESTRIAN_OPTIONS},
             "contours": contours,
             "polygons": True,
         },
         timeout=TIMEOUT,
     )
     if not resp.is_success:
-        logger.error("Stadia isochrone error %s: %s", resp.status_code, resp.text[:500])
+        logger.error(
+            "Valhalla isochrone error %s: %s", resp.status_code, resp.text[:500]
+        )
     resp.raise_for_status()
     data = resp.json()
     return _normalize_valhalla_isochrone(data)
@@ -154,16 +163,17 @@ def directions_ors(coordinates: list[list[float]], api_key: str) -> dict[str, An
 
 def directions_valhalla(coordinates: list[list[float]], api_key: str) -> dict[str, Any]:
     logger.info(
-        "ROUTING_BACKEND_REQUEST backend=stadia endpoint=directions waypoints=%s",
+        "ROUTING_BACKEND_REQUEST backend=valhalla endpoint=directions waypoints=%s",
         len(coordinates),
     )
     locations = [{"lon": lon, "lat": lat} for lon, lat in coordinates]
     resp = httpx.post(
-        f"{STADIA_BASE}/route/v1",
+        f"{VALHALLA_BASE}/route/v1",
         params={"api_key": api_key},
         json={
             "locations": locations,
             "costing": "pedestrian",
+            "costing_options": {"pedestrian": VALHALLA_PEDESTRIAN_OPTIONS},
             "units": "km",
         },
         timeout=TIMEOUT,
