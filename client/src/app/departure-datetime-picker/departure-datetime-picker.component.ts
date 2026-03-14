@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -22,11 +22,19 @@ import { TripDateTimeService } from '../services/trip-datetime.service';
   templateUrl: './departure-datetime-picker.component.html',
   styleUrl: './departure-datetime-picker.component.scss',
 })
-export class DepartureDatetimePickerComponent {
+export class DepartureDatetimePickerComponent implements OnInit {
   private tripDateTime = inject(TripDateTimeService);
 
   pickerDate: Date | null = null;
   pickerTime: Date | null = null;
+
+  ngOnInit(): void {
+    const dt = this.tripDateTime.departureTime();
+    if (dt) {
+      this.pickerDate = new Date(dt);
+      this.pickerTime = new Date(dt);
+    }
+  }
 
   get hasValue(): boolean {
     return this.pickerDate !== null || this.pickerTime !== null;

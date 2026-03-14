@@ -5,6 +5,14 @@ export class TripDateTimeService {
   private readonly _departureTime = signal<Date | null>(null);
   readonly departureTime = this._departureTime.asReadonly();
 
+  constructor() {
+    const raw = new URLSearchParams(window.location.search).get('departure');
+    if (raw) {
+      const d = new Date(raw);
+      if (!isNaN(d.getTime())) this._departureTime.set(d);
+    }
+  }
+
   readonly inputValue = computed(() => {
     const d = this._departureTime();
     if (!d) return '';

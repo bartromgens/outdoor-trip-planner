@@ -5,6 +5,7 @@ import {
   inject,
   NgZone,
   ChangeDetectorRef,
+  effect,
 } from '@angular/core';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
@@ -150,6 +151,8 @@ interface ContourConfig {
   dashArray?: string;
 }
 
+const DEFAULT_CONTOUR_LEVEL = 2000;
+
 const CONTOUR_CONFIGS: ContourConfig[] = [
   { level: 1500, label: 'Contour 1500 m', color: '#a0522d', weight: 1.5, dashArray: '6 4' },
   { level: 1750, label: 'Contour 1750 m', color: '#964b1a', weight: 1.8, dashArray: '7 4' },
@@ -198,9 +201,22 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private reachabilityLayer?: L.LayerGroup;
   private isochroneLayer?: L.LayerGroup;
   private subscription?: Subscription;
+  private baseLayers = new Map<string, L.Layer>();
+  private activeBaseLayerName = 'Standard';
+  private activeOverlayNames = new Set<string>();
+  private urlOverlays: string[] | null = null;
+  private mapReady = false;
+  private syncUrlTimer: ReturnType<typeof setTimeout> | null = null;
   addingLocation = false;
   reachabilityLoading = false;
   isochroneLoading = false;
+
+  constructor() {
+    effect(() => {
+      this.tripDateTime.departureTime();
+      if (this.mapReady) this.debouncedSyncUrl();
+    });
+  }
 
   get reachabilityLoadingText(): string {
     return this.tripDateTime.departureTime()
@@ -209,7 +225,12 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    this.map = L.map('map').setView([46.8182, 8.2275], 8);
+    const urlParams = this.readUrlParams();
+
+    this.map = L.map('map').setView(
+      [urlParams.lat ?? 46.8182, urlParams.lng ?? 8.2275],
+      urlParams.z ?? 8,
+    );
 
     const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:
@@ -227,24 +248,45 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       },
     );
 
-    osmLayer.addTo(this.map);
+    const baseLayerConfig: Record<string, L.Layer> = {
+      Standard: osmLayer,
+      Transport: transportLayer,
+      Satellite: satelliteLayer,
+    };
+    for (const [name, layer] of Object.entries(baseLayerConfig)) {
+      this.baseLayers.set(name, layer);
+    }
+
+    this.activeBaseLayerName =
+      urlParams.base && this.baseLayers.has(urlParams.base) ? urlParams.base : 'Standard';
+    this.baseLayers.get(this.activeBaseLayerName)!.addTo(this.map);
+
+    this.urlOverlays = urlParams.overlays ?? null;
 
     this.layerControl = L.control
-      .layers(
-        {
-          Standard: osmLayer,
-          Transport: transportLayer,
-          Satellite: satelliteLayer,
-        },
-        undefined,
-        { collapsed: true },
-      )
+      .layers(baseLayerConfig, undefined, { collapsed: false })
       .addTo(this.map);
 
     L.control.scale({ imperial: false }).addTo(this.map);
 
+    this.map.on('baselayerchange', (e: L.LayersControlEvent) => {
+      this.activeBaseLayerName = e.name;
+      this.debouncedSyncUrl();
+    });
+    this.map.on('overlayadd', (e: L.LayersControlEvent) => {
+      this.activeOverlayNames.add(e.name);
+      this.debouncedSyncUrl();
+    });
+    this.map.on('overlayremove', (e: L.LayersControlEvent) => {
+      this.activeOverlayNames.delete(e.name);
+      this.debouncedSyncUrl();
+    });
+
     this.emitBbox();
-    this.map.on('moveend', () => this.emitBbox());
+    this.map.on('moveend', () => {
+      this.emitBbox();
+      this.debouncedSyncUrl();
+    });
     this.map.on('contextmenu', (e: L.LeafletMouseEvent) => this.onMapRightClick(e));
 
     this.subscription = this.chatService.mapFeatures$.subscribe((fc) => {
@@ -254,6 +296,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
     this.loadSavedLocations();
     this.loadContourLayers();
+    this.mapReady = true;
   }
 
   private emitBbox(): void {
@@ -265,6 +308,53 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       east: b.getEast(),
     };
     this.chatService.setBbox(bbox);
+  }
+
+  private readUrlParams(): {
+    lat?: number;
+    lng?: number;
+    z?: number;
+    base?: string;
+    overlays?: string[];
+    departure?: string;
+  } {
+    const params = new URLSearchParams(window.location.search);
+    const lat = params.get('lat');
+    const lng = params.get('lng');
+    const z = params.get('z');
+    return {
+      lat: lat !== null ? Number(lat) : undefined,
+      lng: lng !== null ? Number(lng) : undefined,
+      z: z !== null ? Number(z) : undefined,
+      base: params.get('base') ?? undefined,
+      overlays: params.has('overlays')
+        ? params.get('overlays')!.split(',').filter(Boolean)
+        : undefined,
+      departure: params.get('departure') ?? undefined,
+    };
+  }
+
+  private debouncedSyncUrl(): void {
+    if (this.syncUrlTimer) clearTimeout(this.syncUrlTimer);
+    this.syncUrlTimer = setTimeout(() => this.writeUrlParams(), 300);
+  }
+
+  private writeUrlParams(): void {
+    if (!this.mapReady) return;
+    const center = this.map.getCenter();
+    const params = new URLSearchParams();
+    params.set('lat', center.lat.toFixed(4));
+    params.set('lng', center.lng.toFixed(4));
+    params.set('z', String(this.map.getZoom()));
+    params.set('base', this.activeBaseLayerName);
+    if (this.activeOverlayNames.size) {
+      params.set('overlays', [...this.activeOverlayNames].sort().join(','));
+    }
+    const departure = this.tripDateTime.inputValue();
+    if (departure) {
+      params.set('departure', departure);
+    }
+    history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
   }
 
   toggleAddLocation(): void {
@@ -448,6 +538,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.subscription?.unsubscribe();
+    if (this.syncUrlTimer) clearTimeout(this.syncUrlTimer);
     if (this.map) {
       this.map.remove();
     }
@@ -504,6 +595,13 @@ export class MapComponent implements AfterViewInit, OnDestroy {
           },
         });
         this.layerControl.addOverlay(layer, cfg.label);
+        const shouldAdd =
+          this.urlOverlays !== null
+            ? this.urlOverlays.includes(cfg.label)
+            : cfg.level === DEFAULT_CONTOUR_LEVEL;
+        if (shouldAdd) {
+          layer.addTo(this.map);
+        }
       } catch {
         // Silently skip unavailable contour levels
       }
