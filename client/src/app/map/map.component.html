@@ -1,53 +1,31 @@
 <div
   id="map"
-  [class.map--adding]="addingLocation"
-  [class.map--hike-planning]="hikePlanningActive"
+  [class.map--adding]="savedLocations.addingLocation"
+  [class.map--hike-planning]="hikePlanning.hikePlanningActive"
 ></div>
-@if (reachabilityLoading) {
-  <div class="map-loading-overlay">
-    <span class="map-loading-overlay__text">{{ reachabilityLoadingText }}</span>
-  </div>
-}
-@if (isochroneLoading) {
-  <div class="map-loading-overlay">
-    <span class="map-loading-overlay__text">Loading hike isochrones&hellip;</span>
-  </div>
-}
-@if (hikeLoading) {
-  <div class="map-loading-overlay">
-    <span class="map-loading-overlay__text">Loading hike route&hellip;</span>
-  </div>
-}
 
-<div class="map-controls">
-  <button
-    mat-raised-button
-    [color]="addingLocation ? 'warn' : 'primary'"
-    (click)="toggleAddLocation()"
-  >
-    {{ addingLocation ? 'Cancel' : '+ Add location' }}
-  </button>
-  <button
-    mat-raised-button
-    [color]="hikePlanningActive ? 'warn' : 'primary'"
-    (click)="toggleHikePlanning()"
-  >
-    {{ hikePlanningActive ? 'Stop planning' : 'Plan hike' }}
-  </button>
-  @if (hasHikingRanges) {
-    <button mat-raised-button (click)="clearHikingRanges()">Clear hiking ranges</button>
-  }
-  @if (hikePlanningActive) {
-    <button mat-raised-button (click)="clearHikeRoute()">Clear route</button>
-  }
-  @if (hikePlanningActive && hikeRouteLayer && !editingRouteId) {
-    <button mat-raised-button color="accent" [disabled]="hikeLoading" (click)="saveHikeRoute()">
-      Save route
-    </button>
-  }
-  @if (hikePlanningActive && hikeRouteLayer && editingRouteId) {
-    <button mat-raised-button color="accent" [disabled]="hikeLoading" (click)="updateHikeRoute()">
-      Update route
-    </button>
-  }
-</div>
+<app-map-reachability
+  #reachability
+  (hikingRangesCleared)="onHikingRangesCleared()"
+></app-map-reachability>
+<app-hike-planning #hikePlanning [mapUuid]="currentMapUuid"></app-hike-planning>
+<app-map-saved-locations
+  #savedLocations
+  [mapUuid]="currentMapUuid"
+  (locationRangesRequested)="onLocationRangesRequested($event)"
+></app-map-saved-locations>
+
+<app-map-controls
+  [addingLocation]="savedLocations.addingLocation"
+  [hikePlanningActive]="hikePlanning.hikePlanningActive"
+  [hasHikingRanges]="reachability.hasHikingRanges"
+  [hikeRouteLayer]="hikePlanning.hikeRouteLayer"
+  [editingRouteId]="hikePlanning.editingRouteId"
+  [hikeLoading]="hikePlanning.hikeLoading"
+  (addLocationToggle)="savedLocations.toggleAddLocation()"
+  (hikePlanningToggle)="hikePlanning.toggleHikePlanning()"
+  (clearHikingRanges)="reachability.clearHikingRanges()"
+  (clearHikeRoute)="hikePlanning.clearHikeRoute()"
+  (saveHikeRoute)="hikePlanning.saveHikeRoute()"
+  (updateHikeRoute)="hikePlanning.updateHikeRoute()"
+></app-map-controls>

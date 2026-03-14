@@ -76,3 +76,26 @@ class Location(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+
+class LocationIsochroneCache(models.Model):
+    location = models.OneToOneField(
+        Location,
+        on_delete=models.CASCADE,
+        related_name="isochrone_cache",
+    )
+    latitude = models.FloatField(help_text="Lat used for the isochrone request")
+    longitude = models.FloatField(help_text="Lon used for the isochrone request")
+    data = models.JSONField(help_text="Normalized FeatureCollection from ORS/Valhalla")
+
+
+class LocationReachabilityCache(models.Model):
+    location = models.OneToOneField(
+        Location,
+        on_delete=models.CASCADE,
+        related_name="reachability_cache",
+    )
+    data = models.JSONField(help_text="Reachability response: type, origin, features")
+    query_datetime = models.DateTimeField(
+        help_text="Departure time used for the Transitous query (UTC)"
+    )

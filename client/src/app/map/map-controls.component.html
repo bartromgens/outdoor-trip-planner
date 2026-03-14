@@ -1,0 +1,42 @@
+<div class="map-controls">
+  <button
+    mat-raised-button
+    [color]="addingLocation() ? 'warn' : 'primary'"
+    (click)="addLocationToggle.emit()"
+  >
+    {{ addingLocation() ? 'Cancel' : '+ Add location' }}
+  </button>
+  <button
+    mat-raised-button
+    [color]="hikePlanningActive() ? 'warn' : 'primary'"
+    (click)="hikePlanningToggle.emit()"
+  >
+    {{ hikePlanningActive() ? 'Stop planning' : 'Plan hike' }}
+  </button>
+  @if (hasHikingRanges()) {
+    <button mat-raised-button (click)="clearHikingRanges.emit()">Clear hiking ranges</button>
+  }
+  @if (hikePlanningActive()) {
+    <button mat-raised-button (click)="clearHikeRoute.emit()">Clear route</button>
+  }
+  @if (hikePlanningActive() && hikeRouteLayer() && !editingRouteId()) {
+    <button
+      mat-raised-button
+      color="accent"
+      [disabled]="hikeLoading()"
+      (click)="saveHikeRoute.emit()"
+    >
+      Save route
+    </button>
+  }
+  @if (hikePlanningActive() && hikeRouteLayer() && editingRouteId()) {
+    <button
+      mat-raised-button
+      color="accent"
+      [disabled]="hikeLoading()"
+      (click)="updateHikeRoute.emit()"
+    >
+      Update route
+    </button>
+  }
+</div>

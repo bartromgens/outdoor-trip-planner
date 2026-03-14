@@ -38,6 +38,7 @@ export interface ReachabilityResult {
   type: 'FeatureCollection';
   origin: { lat: number; lon: number };
   features: GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>[];
+  query_datetime?: string;
 }
 
 const WINDOW_MINUTES = 90;
@@ -91,6 +92,29 @@ export class TransportService {
     const resp = await fetch(`/api/hike-isochrone/?${params}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json() as Promise<HikeIsochroneResult>;
+  }
+
+  async getLocationHikeIsochrone(
+    mapUuid: string,
+    locationId: number,
+  ): Promise<HikeIsochroneResult> {
+    const resp = await fetch(`/api/maps/${mapUuid}/locations/${locationId}/hike-isochrone/`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json() as Promise<HikeIsochroneResult>;
+  }
+
+  async getLocationReachability(
+    mapUuid: string,
+    locationId: number,
+    time?: string,
+  ): Promise<ReachabilityResult> {
+    const params = new URLSearchParams();
+    if (time) params.set('time', time);
+    const qs = params.toString();
+    const url = `/api/maps/${mapUuid}/locations/${locationId}/reachability/${qs ? `?${qs}` : ''}`;
+    const resp = await fetch(url);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json() as Promise<ReachabilityResult>;
   }
 
   async getReachabilityOptimal(

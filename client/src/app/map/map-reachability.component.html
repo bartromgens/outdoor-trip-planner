@@ -1,0 +1,15 @@
+@if (reachabilityLoading) {
+  <div class="map-loading-overlay">
+    <span class="map-loading-overlay__text">{{ reachabilityLoadingText }}</span>
+  </div>
+}
+@if (isochroneLoading) {
+  <div class="map-loading-overlay">
+    <span class="map-loading-overlay__text">Loading hike isochrones&hellip;</span>
+  </div>
+}
+@if (rangeLoading) {
+  <div class="map-loading-overlay">
+    <span class="map-loading-overlay__text">Loading range &amp; transit&hellip;</span>
+  </div>
+}

@@ -1,11 +1,13 @@
 import json
 import logging
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 from uuid import UUID
 
 import httpx
 from django.http import FileResponse, HttpRequest, HttpResponse, StreamingHttpResponse
+from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 from rest_framework import serializers, status
@@ -15,7 +17,13 @@ from rest_framework.response import Response
 
 from django.conf import settings
 
-from .models import HikeRoute, Location, Map
+from .models import (
+    HikeRoute,
+    Location,
+    LocationIsochroneCache,
+    LocationReachabilityCache,
+    Map,
+)
 from .serializers import HikeRouteSerializer, LocationSerializer, MapSerializer
 from .services.agent import run_agent, stream_agent_events
 from .services import routing as routing_svc
@@ -180,30 +188,24 @@ def contour(request: Request, elevation: int) -> Response:
     return response
 
 
-@api_view(["GET"])
-def reachability(request: Request) -> Response:
-    lat_str = request.query_params.get("lat", "")
-    lon_str = request.query_params.get("lon", "")
-    time_str = request.query_params.get("time", "")
+def _parse_query_datetime(time_str: str | None) -> datetime:
+    if not time_str:
+        return timezone.now()
+    s = time_str.replace("Z", "+00:00")
     try:
-        max_travel_time = int(request.query_params.get("max_travel_time", 60))
-    except (ValueError, TypeError):
-        max_travel_time = 60
-
-    if not lat_str or not lon_str:
-        return Response(
-            {"error": "lat and lon are required"}, status=status.HTTP_400_BAD_REQUEST
-        )
-    try:
-        lat = float(lat_str)
-        lon = float(lon_str)
+        return datetime.fromisoformat(s)
     except ValueError:
-        return Response(
-            {"error": "lat and lon must be numeric"}, status=status.HTTP_400_BAD_REQUEST
-        )
+        return timezone.now()
 
+
+def _fetch_reachability(
+    lat: float,
+    lon: float,
+    time_str: str | None = None,
+    max_travel_time: int = 60,
+) -> tuple[dict[str, Any], datetime]:
     max_travel_time = min(max(max_travel_time, 15), 90)
-
+    query_datetime = _parse_query_datetime(time_str)
     params: dict[str, Any] = {
         "one": f"{lat},{lon}",
         "maxTravelTime": max_travel_time,
@@ -212,25 +214,15 @@ def reachability(request: Request) -> Response:
     }
     if time_str:
         params["time"] = time_str
-
-    try:
-        resp = httpx.get(
-            f"{TRANSITOUS_BASE}/api/v1/one-to-all",
-            params=params,
-            headers=HEADERS,
-            timeout=TIMEOUT,
-        )
-        resp.raise_for_status()
-    except Exception:
-        logger.exception("Reachability API error")
-        return Response(
-            {"error": "Failed to fetch reachability data"},
-            status=status.HTTP_502_BAD_GATEWAY,
-        )
-
+    resp = httpx.get(
+        f"{TRANSITOUS_BASE}/api/v1/one-to-all",
+        params=params,
+        headers=HEADERS,
+        timeout=TIMEOUT,
+    )
+    resp.raise_for_status()
     data = resp.json()
     origin = data.get("one", {})
-
     features: list[dict[str, Any]] = []
     for item in data.get("all", []):
         place = item.get("place", {})
@@ -260,8 +252,7 @@ def reachability(request: Request) -> Response:
                 },
             }
         )
-
-    return Response(
+    return (
         {
             "type": "FeatureCollection",
             "origin": {
@@ -269,8 +260,40 @@ def reachability(request: Request) -> Response:
                 "lon": origin.get("lon", lon),
             },
             "features": features,
-        }
+        },
+        query_datetime,
     )
+
+
+@api_view(["GET"])
+def reachability(request: Request) -> Response:
+    lat_str = request.query_params.get("lat", "")
+    lon_str = request.query_params.get("lon", "")
+    time_str = request.query_params.get("time", "")
+    try:
+        max_travel_time = int(request.query_params.get("max_travel_time", 60))
+    except (ValueError, TypeError):
+        max_travel_time = 60
+    if not lat_str or not lon_str:
+        return Response(
+            {"error": "lat and lon are required"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        lat = float(lat_str)
+        lon = float(lon_str)
+    except ValueError:
+        return Response(
+            {"error": "lat and lon must be numeric"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        data, _ = _fetch_reachability(lat, lon, time_str, max_travel_time)
+        return Response(data)
+    except Exception:
+        logger.exception("Reachability API error")
+        return Response(
+            {"error": "Failed to fetch reachability data"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
 
 
 def _routing_backend() -> str:
@@ -488,6 +511,71 @@ def map_location_detail(request: Request, uuid: UUID, pk: int) -> Response:
 
     loc.delete()
     return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(["GET"])
+def location_hike_isochrone(request: Request, uuid: UUID, pk: int) -> Response:
+    map_obj = _get_map_or_404(uuid)
+    try:
+        loc = Location.objects.get(pk=pk, map=map_obj)
+    except Location.DoesNotExist:
+        return Response(
+            {"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    cache = LocationIsochroneCache.objects.filter(location=loc).first()
+    if cache is not None:
+        return Response(cache.data)
+    api_key = _routing_api_key()
+    if not api_key:
+        return _routing_not_configured_error()
+    lat, lon = loc.latitude, loc.longitude
+    backend = _routing_backend()
+    try:
+        if backend == "valhalla":
+            data = routing_svc.isochrone_valhalla(lat, lon, api_key)
+        else:
+            data = routing_svc.isochrone_ors(lat, lon, api_key)
+    except Exception:
+        logger.exception("%s isochrone API error", backend.upper())
+        return Response(
+            {"error": "Failed to fetch isochrone data"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    LocationIsochroneCache.objects.create(
+        location=loc, latitude=lat, longitude=lon, data=data
+    )
+    return Response(data)
+
+
+@api_view(["GET"])
+def location_reachability(request: Request, uuid: UUID, pk: int) -> Response:
+    map_obj = _get_map_or_404(uuid)
+    try:
+        loc = Location.objects.get(pk=pk, map=map_obj)
+    except Location.DoesNotExist:
+        return Response(
+            {"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    time_str = request.query_params.get("time", "")
+    cache = LocationReachabilityCache.objects.filter(location=loc).first()
+    if cache is not None:
+        out = {**cache.data, "query_datetime": cache.query_datetime.isoformat()}
+        return Response(out)
+    lat, lon = loc.latitude, loc.longitude
+    try:
+        data, query_dt = _fetch_reachability(lat, lon, time_str or None, 60)
+    except Exception:
+        logger.exception("Reachability API error")
+        return Response(
+            {"error": "Failed to fetch reachability data"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+    LocationReachabilityCache.objects.update_or_create(
+        location=loc,
+        defaults={"data": data, "query_datetime": query_dt},
+    )
+    out = {**data, "query_datetime": query_dt.isoformat()}
+    return Response(out)
 
 
 @api_view(["GET", "POST"])

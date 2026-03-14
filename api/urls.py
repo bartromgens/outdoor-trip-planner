@@ -24,6 +24,16 @@ urlpatterns = [
         name="map-location-detail",
     ),
     path(
+        "maps/<uuid:uuid>/locations/<int:pk>/hike-isochrone/",
+        views.location_hike_isochrone,
+        name="location-hike-isochrone",
+    ),
+    path(
+        "maps/<uuid:uuid>/locations/<int:pk>/reachability/",
+        views.location_reachability,
+        name="location-reachability",
+    ),
+    path(
         "maps/<uuid:uuid>/hike-routes/",
         views.map_hike_routes,
         name="map-hike-routes",
