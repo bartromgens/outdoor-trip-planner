@@ -1,0 +1,59 @@
+// CSS token overrides to render form-fields white inside a primary toolbar
+$white-full: white;
+$white-mid: rgba(255, 255, 255, 0.6);
+$white-low: rgba(255, 255, 255, 0.35);
+
+:host {
+  --mdc-outlined-text-field-outline-color: #{$white-low};
+  --mdc-outlined-text-field-hover-outline-color: #{$white-mid};
+  --mdc-outlined-text-field-focus-outline-color: #{$white-full};
+  --mdc-outlined-text-field-input-text-color: #{$white-full};
+  --mdc-outlined-text-field-label-text-color: #{$white-mid};
+  --mdc-outlined-text-field-focus-label-text-color: #{$white-full};
+  --mdc-outlined-text-field-hover-label-text-color: #{$white-mid};
+  --mdc-outlined-text-field-input-text-placeholder-color: #{$white-low};
+  --mat-form-field-outlined-label-text-populated-size: 11px;
+  --mat-datepicker-toggle-icon-button-color: #{$white-mid};
+  --mat-timepicker-toggle-icon-button-color: #{$white-mid};
+  --mat-icon-button-icon-color: #{$white-mid};
+  --mat-icon-button-state-layer-color: #{$white-full};
+}
+
+.dp-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dp-label {
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  opacity: 0.7;
+  white-space: nowrap;
+}
+
+.dp-field {
+  &--date {
+    width: 140px;
+  }
+
+  &--time {
+    width: 120px;
+  }
+}
+
+.dp-clear {
+  color: inherit;
+  opacity: 0.65;
+
+  &:hover {
+    opacity: 1;
+  }
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}

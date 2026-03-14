@@ -3,10 +3,17 @@ import { RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSidenavModule } from '@angular/material/sidenav';
 import { ChatComponent } from './chat/chat.component';
+import { DepartureDatetimePickerComponent } from './departure-datetime-picker/departure-datetime-picker.component';
 
 @Component({
   selector: 'app-root',
-  imports: [RouterOutlet, MatToolbarModule, MatSidenavModule, ChatComponent],
+  imports: [
+    RouterOutlet,
+    MatToolbarModule,
+    MatSidenavModule,
+    ChatComponent,
+    DepartureDatetimePickerComponent,
+  ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
 })

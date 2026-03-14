@@ -1,0 +1,45 @@
+<div class="dp-wrapper">
+  <span class="dp-label">Departure</span>
+
+  <mat-form-field class="dp-field dp-field--date" appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Date</mat-label>
+    <input
+      matInput
+      [matDatepicker]="datePicker"
+      [(ngModel)]="pickerDate"
+      (ngModelChange)="onDateChange()"
+      placeholder="Pick date"
+    />
+    <mat-datepicker-toggle matIconSuffix [for]="datePicker">
+      <mat-icon matDatepickerToggleIcon>calendar_today</mat-icon>
+    </mat-datepicker-toggle>
+    <mat-datepicker #datePicker></mat-datepicker>
+  </mat-form-field>
+
+  <mat-form-field class="dp-field dp-field--time" appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Time</mat-label>
+    <input
+      matInput
+      [matTimepicker]="timePicker"
+      [(ngModel)]="pickerTime"
+      (ngModelChange)="onTimeChange()"
+      placeholder="Pick time"
+    />
+    <mat-timepicker-toggle matIconSuffix [for]="timePicker">
+      <mat-icon matTimepickerToggleIcon>schedule</mat-icon>
+    </mat-timepicker-toggle>
+    <mat-timepicker #timePicker [interval]="1800"></mat-timepicker>
+  </mat-form-field>
+
+  @if (hasValue) {
+    <button
+      mat-icon-button
+      class="dp-clear"
+      type="button"
+      title="Clear departure time"
+      (click)="clear()"
+    >
+      <mat-icon>close</mat-icon>
+    </button>
+  }
+</div>

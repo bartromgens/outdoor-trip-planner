@@ -1,7 +1,7 @@
 <div id="map" [class.map--adding]="addingLocation"></div>
 @if (reachabilityLoading) {
   <div class="map-loading-overlay">
-    <span class="map-loading-overlay__text">Loading reachability&hellip;</span>
+    <span class="map-loading-overlay__text">{{ reachabilityLoadingText }}</span>
   </div>
 }
 <div class="map-controls">

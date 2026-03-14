@@ -14,6 +14,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
 import { TransportService, type ReachabilityStop } from '../services/transport.service';
+import { TripDateTimeService } from '../services/trip-datetime.service';
 import type { BoundingBox } from '../services/chat.service';
 import { environment } from '../../environments/environment';
 import {
@@ -119,6 +120,10 @@ const CONTOUR_CONFIGS: ContourConfig[] = [
   { level: 3000, label: 'Contour 3000 m', color: '#4a1500', weight: 3 },
 ];
 
+function formatDepartureTime(isoUtc: string): string {
+  return new Date(isoUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 function buildTransportLayer(): L.TileLayer {
   const key = environment.thunderforestApiKey;
   if (key) {
@@ -144,6 +149,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private chatService = inject(ChatService);
   private locationService = inject(LocationService);
   private transportService = inject(TransportService);
+  private tripDateTime = inject(TripDateTimeService);
   private dialog = inject(MatDialog);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
@@ -155,6 +161,12 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private subscription?: Subscription;
   addingLocation = false;
   reachabilityLoading = false;
+
+  get reachabilityLoadingText(): string {
+    return this.tripDateTime.departureTime()
+      ? 'Optimizing reachability (6 slots)\u2026'
+      : 'Loading reachability\u2026';
+  }
 
   ngAfterViewInit(): void {
     this.map = L.map('map').setView([46.8182, 8.2275], 8);
@@ -247,11 +259,16 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
   private onMapRightClick(e: L.LeafletMouseEvent): void {
     const { lat, lng } = e.latlng;
+    const departure = this.tripDateTime.departureTime();
+    const departureHint = departure
+      ? `<div style="font-size:11px;opacity:.65;margin-bottom:6px">6 slots from ${formatDepartureTime(departure.toISOString())}</div>`
+      : '';
     const popup = L.popup({ closeButton: true, minWidth: 180 })
       .setLatLng(e.latlng)
       .setContent(
         `<div>
-          <div style="font-weight:600;margin-bottom:8px">Transit reachability</div>
+          <div style="font-weight:600;margin-bottom:4px">Transit reachability</div>
+          ${departureHint}
           <button class="reachability-trigger-btn" type="button">
             Show stops within 60 min
           </button>
@@ -273,7 +290,10 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     this.reachabilityLoading = true;
     this.cdr.detectChanges();
     try {
-      const result = await this.transportService.getReachability(lat, lng);
+      const departureTime = this.tripDateTime.departureTime();
+      const result = departureTime
+        ? await this.transportService.getReachabilityOptimal(lat, lng, departureTime)
+        : await this.transportService.getReachability(lat, lng);
       this.renderReachabilityLayer(result.features);
     } catch {
       console.error('Failed to load reachability data');
@@ -301,9 +321,12 @@ export class MapComponent implements AfterViewInit, OnDestroy {
           : props.transfers === 1
             ? '1 transfer'
             : `${props.transfers} transfers`;
+      const timeText = props.best_time
+        ? `<br><span style="font-size:11px;opacity:.65">Best at ${formatDepartureTime(props.best_time)}</span>`
+        : '';
       marker.bindPopup(
         `<b>${props.name}</b><br>
-        <span style="font-size:12px">${props.duration_min} min &mdash; ${transferText}</span>`,
+        <span style="font-size:12px">${props.duration_min} min &mdash; ${transferText}</span>${timeText}`,
       );
       return marker;
     });
