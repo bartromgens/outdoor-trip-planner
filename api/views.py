@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 from typing import Any
 
+import httpx
 from django.http import FileResponse, HttpRequest, HttpResponse, StreamingHttpResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -14,6 +15,7 @@ from rest_framework.response import Response
 from .models import Location
 from .serializers import LocationSerializer
 from .services.agent import run_agent, stream_agent_events
+from .services.tools.transport import HEADERS, TIMEOUT, TRANSITOUS_BASE
 from .services.tools.wikidata import find_place_info
 
 logger = logging.getLogger(__name__)
@@ -163,6 +165,99 @@ def contour(request: Request, elevation: int) -> Response:
     response = FileResponse(path.open("rb"), content_type="application/geo+json")
     response["Cache-Control"] = "public, max-age=86400"
     return response
+
+
+@api_view(["GET"])
+def reachability(request: Request) -> Response:
+    lat_str = request.query_params.get("lat", "")
+    lon_str = request.query_params.get("lon", "")
+    time_str = request.query_params.get("time", "")
+    try:
+        max_travel_time = int(request.query_params.get("max_travel_time", 60))
+    except (ValueError, TypeError):
+        max_travel_time = 60
+
+    if not lat_str or not lon_str:
+        return Response(
+            {"error": "lat and lon are required"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        lat = float(lat_str)
+        lon = float(lon_str)
+    except ValueError:
+        return Response(
+            {"error": "lat and lon must be numeric"}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    max_travel_time = min(max(max_travel_time, 15), 90)
+
+    params: dict[str, Any] = {
+        "one": f"{lat},{lon}",
+        "maxTravelTime": max_travel_time,
+        "maxMatchingDistance": 150,
+        "maxTransfers": 3,
+    }
+    if time_str:
+        params["time"] = time_str
+
+    try:
+        resp = httpx.get(
+            f"{TRANSITOUS_BASE}/api/v1/one-to-all",
+            params=params,
+            headers=HEADERS,
+            timeout=TIMEOUT,
+        )
+        resp.raise_for_status()
+    except Exception:
+        logger.exception("Reachability API error")
+        return Response(
+            {"error": "Failed to fetch reachability data"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    data = resp.json()
+    origin = data.get("one", {})
+
+    features: list[dict[str, Any]] = []
+    for item in data.get("all", []):
+        place = item.get("place", {})
+        if "lat" not in place or "lon" not in place:
+            continue
+        duration_min = item.get("duration", 0)
+        if duration_min <= 15:
+            bucket = 15
+        elif duration_min <= 30:
+            bucket = 30
+        elif duration_min <= 45:
+            bucket = 45
+        else:
+            bucket = 60
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [place["lon"], place["lat"]],
+                },
+                "properties": {
+                    "name": place.get("name", ""),
+                    "duration_min": duration_min,
+                    "bucket": bucket,
+                    "transfers": max(0, item.get("k", 1) - 1),
+                },
+            }
+        )
+
+    return Response(
+        {
+            "type": "FeatureCollection",
+            "origin": {
+                "lat": origin.get("lat", lat),
+                "lon": origin.get("lon", lon),
+            },
+            "features": features,
+        }
+    )
 
 
 @csrf_exempt

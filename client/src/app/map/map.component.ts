@@ -7,11 +7,13 @@ import {
   ChangeDetectorRef,
 } from '@angular/core';
 import * as L from 'leaflet';
+import type * as GeoJSON from 'geojson';
 import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
+import { TransportService, type ReachabilityStop } from '../services/transport.service';
 import type { BoundingBox } from '../services/chat.service';
 import { environment } from '../../environments/environment';
 import {
@@ -33,8 +35,32 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const DEFAULT_COLOR = '#1976d2';
 
+const BUCKET_COLORS: Record<number, string> = {
+  15: '#2e7d32',
+  30: '#f9a825',
+  45: '#e65100',
+  60: '#b71c1c',
+};
+
 function colorForCategory(category?: string): string {
   return (category && CATEGORY_COLORS[category]) || DEFAULT_COLOR;
+}
+
+function reachabilityIcon(bucket: number): L.DivIcon {
+  const color = BUCKET_COLORS[bucket] ?? '#757575';
+  return L.divIcon({
+    className: 'map-marker',
+    html: `<div style="
+      background:${color};
+      width:8px;height:8px;
+      border-radius:50%;
+      border:1.5px solid rgba(255,255,255,0.8);
+      box-shadow:0 1px 3px rgba(0,0,0,.4);
+    "></div>`,
+    iconSize: [11, 11],
+    iconAnchor: [5, 5],
+    popupAnchor: [0, -7],
+  });
 }
 
 function iconForCategory(category?: string): L.DivIcon {
@@ -117,6 +143,7 @@ function buildTransportLayer(): L.TileLayer {
 export class MapComponent implements AfterViewInit, OnDestroy {
   private chatService = inject(ChatService);
   private locationService = inject(LocationService);
+  private transportService = inject(TransportService);
   private dialog = inject(MatDialog);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
@@ -124,8 +151,10 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private layerControl!: L.Control.Layers;
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
+  private reachabilityLayer?: L.LayerGroup;
   private subscription?: Subscription;
   addingLocation = false;
+  reachabilityLoading = false;
 
   ngAfterViewInit(): void {
     this.map = L.map('map').setView([46.8182, 8.2275], 8);
@@ -164,6 +193,7 @@ export class MapComponent implements AfterViewInit, OnDestroy {
 
     this.emitBbox();
     this.map.on('moveend', () => this.emitBbox());
+    this.map.on('contextmenu', (e: L.LeafletMouseEvent) => this.onMapRightClick(e));
 
     this.subscription = this.chatService.mapFeatures$.subscribe((fc) => {
       if (!fc) return;
@@ -213,6 +243,73 @@ export class MapComponent implements AfterViewInit, OnDestroy {
           .catch((err) => console.error('Failed to save location', err));
       });
     });
+  }
+
+  private onMapRightClick(e: L.LeafletMouseEvent): void {
+    const { lat, lng } = e.latlng;
+    const popup = L.popup({ closeButton: true, minWidth: 180 })
+      .setLatLng(e.latlng)
+      .setContent(
+        `<div>
+          <div style="font-weight:600;margin-bottom:8px">Transit reachability</div>
+          <button class="reachability-trigger-btn" type="button">
+            Show stops within 60 min
+          </button>
+        </div>`,
+      )
+      .openOn(this.map);
+
+    setTimeout(() => {
+      const btn = popup.getElement()?.querySelector<HTMLButtonElement>('.reachability-trigger-btn');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        this.map.closePopup();
+        this.ngZone.run(() => this.loadReachability(lat, lng));
+      });
+    }, 0);
+  }
+
+  private async loadReachability(lat: number, lng: number): Promise<void> {
+    this.reachabilityLoading = true;
+    this.cdr.detectChanges();
+    try {
+      const result = await this.transportService.getReachability(lat, lng);
+      this.renderReachabilityLayer(result.features);
+    } catch {
+      console.error('Failed to load reachability data');
+    } finally {
+      this.reachabilityLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  private renderReachabilityLayer(
+    features: GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>[],
+  ): void {
+    if (this.reachabilityLayer) {
+      this.layerControl.removeLayer(this.reachabilityLayer);
+      this.map.removeLayer(this.reachabilityLayer);
+    }
+
+    const markers = features.map((f) => {
+      const [lon, lat] = f.geometry.coordinates as [number, number];
+      const props = f.properties;
+      const marker = L.marker([lat, lon], { icon: reachabilityIcon(props.bucket) });
+      const transferText =
+        props.transfers === 0
+          ? 'Direct'
+          : props.transfers === 1
+            ? '1 transfer'
+            : `${props.transfers} transfers`;
+      marker.bindPopup(
+        `<b>${props.name}</b><br>
+        <span style="font-size:12px">${props.duration_min} min &mdash; ${transferText}</span>`,
+      );
+      return marker;
+    });
+
+    this.reachabilityLayer = L.layerGroup(markers).addTo(this.map);
+    this.layerControl.addOverlay(this.reachabilityLayer, 'Transit reachability');
   }
 
   ngOnDestroy(): void {

@@ -9,4 +9,5 @@ urlpatterns = [
     path("locations/", views.locations, name="locations"),
     path("locations/<int:pk>/", views.location_detail, name="location-detail"),
     path("contours/<int:elevation>/", views.contour, name="contour"),
+    path("reachability/", views.reachability, name="reachability"),
 ]
