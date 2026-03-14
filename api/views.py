@@ -60,9 +60,18 @@ def chat(request: Request) -> Response:
         )
 
     bbox = request.data.get("bbox") or None
+    locations_in_view = request.data.get("locations_in_view") or None
+    reachability_markers_in_view = (
+        request.data.get("reachability_markers_in_view") or None
+    )
 
     try:
-        result = run_agent(messages, bbox=bbox)
+        result = run_agent(
+            messages,
+            bbox=bbox,
+            locations_in_view=locations_in_view,
+            reachability_markers_in_view=reachability_markers_in_view,
+        )
     except Exception:
         logger.exception("Agent error")
         return Response(
@@ -82,9 +91,16 @@ def chat(request: Request) -> Response:
 def _ndjson_event_stream(
     messages: list[dict[str, Any]],
     bbox: dict[str, float] | None,
+    locations_in_view: list[dict[str, Any]] | None = None,
+    reachability_markers_in_view: list[dict[str, Any]] | None = None,
 ) -> Any:
     try:
-        for event in stream_agent_events(messages, bbox=bbox):
+        for event in stream_agent_events(
+            messages,
+            bbox=bbox,
+            locations_in_view=locations_in_view,
+            reachability_markers_in_view=reachability_markers_in_view,
+        ):
             yield json.dumps(event, ensure_ascii=False) + "\n"
     except Exception:
         logger.exception("Agent stream error")
@@ -640,8 +656,15 @@ def chat_stream(request: HttpRequest) -> HttpResponse:
         )
 
     bbox = body.get("bbox") or None
+    locations_in_view = body.get("locations_in_view") or None
+    reachability_markers_in_view = body.get("reachability_markers_in_view") or None
 
     return StreamingHttpResponse(
-        _ndjson_event_stream(messages, bbox),
+        _ndjson_event_stream(
+            messages,
+            bbox=bbox,
+            locations_in_view=locations_in_view,
+            reachability_markers_in_view=reachability_markers_in_view,
+        ),
         content_type="application/x-ndjson",
     )

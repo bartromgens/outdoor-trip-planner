@@ -1,19 +1,15 @@
-import {
-  Component,
-  inject,
-  input,
-  output,
-  effect,
-  NgZone,
-  OnDestroy,
-} from '@angular/core';
+import { Component, inject, input, output, effect, NgZone, OnDestroy } from '@angular/core';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import { Subscription } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ChatService } from '../services/chat.service';
-import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
+import {
+  LocationService,
+  savedLocationsToFeatureCollection,
+  type SavedLocation,
+} from '../services/location.service';
 import {
   AddLocationDialogComponent,
   type AddLocationDialogResult,
@@ -96,8 +92,13 @@ export class MapSavedLocationsComponent implements OnDestroy {
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
   private subscription?: Subscription;
+  private lastLoadedLocations: SavedLocation[] = [];
 
   locationRangesRequested = output<number>();
+
+  getLocationsInBounds(bounds: L.LatLngBounds): SavedLocation[] {
+    return this.lastLoadedLocations.filter((loc) => bounds.contains([loc.latitude, loc.longitude]));
+  }
 
   constructor() {
     effect(() => {
@@ -124,6 +125,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
     if (!this.map) return;
     try {
       const locations = await this.locationService.getAll(uuid);
+      this.lastLoadedLocations = locations;
       const fc = savedLocationsToFeatureCollection(locations);
       if (this.savedLayer) {
         this.map.removeLayer(this.savedLayer);
@@ -153,7 +155,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
               '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
                 '<button class="saved-location-edit-btn" type="button" style="background:#1976d2;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">Edit</button>' +
                 '<button class="saved-location-delete-btn" type="button" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">Delete</button>' +
-              '</div>',
+                '</div>',
             );
           }
           layer.bindPopup(parts.join('<br>'));
@@ -163,7 +165,9 @@ export class MapSavedLocationsComponent implements OnDestroy {
             });
             layer.on('popupopen', (e: L.PopupEvent) => {
               const popupEl = e.popup.getElement();
-              const deleteBtn = popupEl?.querySelector<HTMLButtonElement>('.saved-location-delete-btn');
+              const deleteBtn = popupEl?.querySelector<HTMLButtonElement>(
+                '.saved-location-delete-btn',
+              );
               const editBtn = popupEl?.querySelector<HTMLButtonElement>('.saved-location-edit-btn');
               const onClose = () => {
                 deleteBtn?.removeEventListener('click', deleteHandler);
@@ -231,9 +235,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
           (layer as L.Marker).closePopup();
           return this.loadSavedLocations();
         })
-        .then(() =>
-          this.snackBar.open('Location updated', 'Dismiss', { duration: 3000 }),
-        )
+        .then(() => this.snackBar.open('Location updated', 'Dismiss', { duration: 3000 }))
         .catch((err) => console.error('Failed to update location', err));
     });
   }

@@ -270,6 +270,12 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
       east: b.getEast(),
     };
     this.chatService.setBbox(bbox);
+    const locationsInView = this.savedLocationsComp.getLocationsInBounds(b);
+    const reachabilityInView = this.reachabilityComp.getReachabilityInBounds(b);
+    this.chatService.setContext({
+      locationsInView,
+      reachabilityMarkersInView: reachabilityInView,
+    });
   }
 
   private readUrlParams(): {

@@ -1,6 +1,8 @@
 import { Injectable } from '@angular/core';
 import { BehaviorSubject } from 'rxjs';
 import type * as GeoJSON from 'geojson';
+import type { SavedLocation } from './location.service';
+import type { ReachabilityStop } from './transport.service';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -18,6 +20,8 @@ export interface BoundingBox {
   north: number;
   east: number;
 }
+
+export type ReachabilityMarkerInView = GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>;
 
 interface ToolCallEvent {
   type: 'tool_call';
@@ -50,6 +54,8 @@ export class ChatService {
   private abortController: AbortController | null = null;
   private currentBbox: BoundingBox | null = null;
   private currentMapUuid: string | null = null;
+  private locationsInView: SavedLocation[] = [];
+  private reachabilityMarkersInView: ReachabilityMarkerInView[] = [];
 
   readonly displayMessages$ = new BehaviorSubject<DisplayMessage[]>([]);
   readonly mapFeatures$ = new BehaviorSubject<GeoJSON.FeatureCollection | null>(null);
@@ -62,6 +68,18 @@ export class ChatService {
 
   setMapUuid(uuid: string): void {
     this.currentMapUuid = uuid;
+  }
+
+  setContext(options: {
+    locationsInView?: SavedLocation[];
+    reachabilityMarkersInView?: ReachabilityMarkerInView[];
+  }): void {
+    if (options.locationsInView !== undefined) {
+      this.locationsInView = options.locationsInView;
+    }
+    if (options.reachabilityMarkersInView !== undefined) {
+      this.reachabilityMarkersInView = options.reachabilityMarkersInView;
+    }
   }
 
   stop(): void {
@@ -98,6 +116,12 @@ export class ChatService {
       }
       if (this.currentMapUuid) {
         body['map_uuid'] = this.currentMapUuid;
+      }
+      if (this.locationsInView.length > 0) {
+        body['locations_in_view'] = this.locationsInView;
+      }
+      if (this.reachabilityMarkersInView.length > 0) {
+        body['reachability_markers_in_view'] = this.reachabilityMarkersInView;
       }
 
       const response = await fetch('/api/chat/stream/', {
@@ -167,5 +191,7 @@ export class ChatService {
     this.mapFeatures$.next(null);
     this.toolActivity$.next(null);
     this.currentMapUuid = null;
+    this.locationsInView = [];
+    this.reachabilityMarkersInView = [];
   }
 }

@@ -103,23 +103,63 @@ def _tool_label(name: str, tool_input: dict[str, Any]) -> str:
             return f"Using tool: {name}"
 
 
-def _build_system_prompt(bbox: dict[str, float] | None) -> str:
-    if not bbox:
-        return SYSTEM_PROMPT
-    south = bbox.get("south", 0)
-    west = bbox.get("west", 0)
-    north = bbox.get("north", 0)
-    east = bbox.get("east", 0)
-    bbox_section = (
-        f"\n\n## Current Map View\n"
-        f"The user's map is currently showing the area with bounding box "
-        f"south={south:.4f}, west={west:.4f}, north={north:.4f}, east={east:.4f}. "
-        f"Whenever the user asks a question without explicitly naming a region, "
-        f"treat this area as the default search context — do NOT ask for "
-        f"clarification. Use the bounding box coordinates for Overpass queries "
-        f"and as the geographic scope for web searches and Wikipedia lookups."
-    )
-    return SYSTEM_PROMPT + bbox_section
+def _build_system_prompt(
+    bbox: dict[str, float] | None = None,
+    locations_in_view: list[dict[str, Any]] | None = None,
+    reachability_markers_in_view: list[dict[str, Any]] | None = None,
+) -> str:
+    parts = [SYSTEM_PROMPT]
+    if bbox:
+        south = bbox.get("south", 0)
+        west = bbox.get("west", 0)
+        north = bbox.get("north", 0)
+        east = bbox.get("east", 0)
+        parts.append(
+            f"\n\n## Current Map View\n"
+            f"The user's map is currently showing the area with bounding box "
+            f"south={south:.4f}, west={west:.4f}, north={north:.4f}, east={east:.4f}. "
+            f"Whenever the user asks a question without explicitly naming a region, "
+            f"treat this area as the default search context — do NOT ask for "
+            f"clarification. Use the bounding box coordinates for Overpass queries "
+            f"and as the geographic scope for web searches and Wikipedia lookups."
+        )
+    if locations_in_view:
+        lines = ["Saved locations currently visible on the map:"]
+        for loc in locations_in_view:
+            name = loc.get("name", "?")
+            cat = loc.get("category", "")
+            lat = loc.get("latitude")
+            lon = loc.get("longitude")
+            desc = (loc.get("description") or "").strip()
+            extra = f" ({cat})" if cat else ""
+            if lat is not None and lon is not None:
+                extra += f" at {lat:.4f}, {lon:.4f}"
+            if desc:
+                extra += f" — {desc[:200]}{'…' if len(desc) > 200 else ''}"
+            lines.append(f"- {name}{extra}")
+        parts.append("\n\n## Locations in View\n" + "\n".join(lines))
+    if reachability_markers_in_view:
+        lines = [
+            "Transit reachability markers currently visible (stops within ~60 min):"
+        ]
+        for f in reachability_markers_in_view:
+            props = f.get("properties") or {}
+            geom = f.get("geometry") or {}
+            coords = geom.get("coordinates", [])
+            name = props.get("name", "?")
+            duration = props.get("duration_min", "?")
+            transfers = props.get("transfers", 0)
+            transfer_txt = "direct" if transfers == 0 else f"{transfers} transfer(s)"
+            lon = coords[0] if len(coords) > 0 else None
+            lat = coords[1] if len(coords) > 1 else None
+            pos = (
+                f" at {lat:.4f}, {lon:.4f}"
+                if lat is not None and lon is not None
+                else ""
+            )
+            lines.append(f"- {name}: {duration} min, {transfer_txt}{pos}")
+        parts.append("\n\n## Reachability Markers in View\n" + "\n".join(lines))
+    return "".join(parts)
 
 
 def _truncate_tool_result(text: str) -> str:
@@ -158,6 +198,8 @@ def _log_llm_response(response: anthropic.types.Message) -> None:
 def stream_agent_events(
     messages: list[dict[str, Any]],
     bbox: dict[str, float] | None = None,
+    locations_in_view: list[dict[str, Any]] | None = None,
+    reachability_markers_in_view: list[dict[str, Any]] | None = None,
 ) -> Generator[dict[str, Any], None, None]:
     api_key = getattr(settings, "CLAUDE_API_KEY", None)
     if not api_key:
@@ -173,7 +215,11 @@ def stream_agent_events(
     model = getattr(settings, "CLAUDE_MODEL")
     client = anthropic.Anthropic(api_key=api_key)
     map_features: list[dict[str, Any]] = []
-    system_prompt = _build_system_prompt(bbox)
+    system_prompt = _build_system_prompt(
+        bbox=bbox,
+        locations_in_view=locations_in_view,
+        reachability_markers_in_view=reachability_markers_in_view,
+    )
 
     logger.info(
         "Agent start  model=%s  messages=%d  bbox=%s",
@@ -318,6 +364,8 @@ def stream_agent_events(
 def run_agent(
     messages: list[dict[str, Any]],
     bbox: dict[str, float] | None = None,
+    locations_in_view: list[dict[str, Any]] | None = None,
+    reachability_markers_in_view: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     api_key = getattr(settings, "CLAUDE_API_KEY", None)
     if not api_key:
@@ -331,7 +379,11 @@ def run_agent(
     model = getattr(settings, "CLAUDE_MODEL")
     client = anthropic.Anthropic(api_key=api_key)
     map_features: list[dict[str, Any]] = []
-    system_prompt = _build_system_prompt(bbox)
+    system_prompt = _build_system_prompt(
+        bbox=bbox,
+        locations_in_view=locations_in_view,
+        reachability_markers_in_view=reachability_markers_in_view,
+    )
 
     logger.info(
         "Agent start  model=%s  messages=%d  bbox=%s",
