@@ -1,0 +1,10 @@
+env/
+client/
+*.pyc
+__pycache__/
+.git/
+.gitignore
+db.sqlite3
+config/settings_local.py
+*.md
+.flake8

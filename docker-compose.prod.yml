@@ -1,0 +1,19 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:8026:8000"
+    volumes:
+      - ./config/settings_local.py:/app/config/settings_local.py:ro
+      - ./db.sqlite3:/app/db.sqlite3
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "127.0.0.1:3026:80"
+    restart: unless-stopped
