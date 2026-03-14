@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import HikeRoute, Location, Map
+from .models import (
+    HikeRoute,
+    Location,
+    LocationIsochroneCache,
+    LocationReachabilityCache,
+    Map,
+)
 
 
 class HikeRouteInline(admin.TabularInline):
@@ -48,3 +54,18 @@ class LocationAdmin(admin.ModelAdmin):
     search_fields = ["name", "description"]
     readonly_fields = ["created_at", "updated_at"]
     raw_id_fields = ["map"]
+
+
+@admin.register(LocationIsochroneCache)
+class LocationIsochroneCacheAdmin(admin.ModelAdmin):
+    list_display = ["location", "latitude", "longitude"]
+    readonly_fields = ["location", "latitude", "longitude", "data"]
+    raw_id_fields = ["location"]
+
+
+@admin.register(LocationReachabilityCache)
+class LocationReachabilityCacheAdmin(admin.ModelAdmin):
+    list_display = ["location", "query_datetime"]
+    list_filter = ["query_datetime"]
+    readonly_fields = ["location", "data", "query_datetime"]
+    raw_id_fields = ["location"]
