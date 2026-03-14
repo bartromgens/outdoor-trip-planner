@@ -8,15 +8,14 @@ import {
   ChangeDetectorRef,
   effect,
   signal,
-  computed,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
-import { MatMenuModule } from '@angular/material/menu';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { FormsModule } from '@angular/forms';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
@@ -231,7 +230,7 @@ function buildTransportLayer(): L.TileLayer {
   selector: 'app-map',
   templateUrl: './map.component.html',
   styleUrl: './map.component.scss',
-  imports: [MatButtonModule, MatMenuModule, FormsModule],
+  imports: [MatButtonModule],
 })
 export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private chatService = inject(ChatService);
@@ -245,6 +244,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private dialog = inject(MatDialog);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
+  private snackBar = inject(MatSnackBar);
   private map!: L.Map;
   private layerControl!: L.Control.Layers;
   private featureLayer?: L.GeoJSON;
@@ -252,6 +252,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private reachabilityLayer?: L.LayerGroup;
   private isochroneLayer?: L.LayerGroup;
   private subscription?: Subscription;
+  private routeParamsSubscription?: Subscription;
   private baseLayers = new Map<string, L.Layer>();
   private activeBaseLayerName = 'Standard';
   private activeOverlayNames = new Set<string>();
@@ -275,13 +276,6 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private savedHikesLayer?: L.LayerGroup;
 
   currentMapUuid = '';
-  mapSelectorOpen = false;
-  editingMapName = false;
-  mapNameInput = '';
-  readonly myMaps = computed(() => this.mapManager.myMaps());
-  get currentMapName(): string {
-    return this.mapManager.getMapName(this.currentMapUuid);
-  }
 
   constructor() {
     effect(() => {
@@ -290,21 +284,45 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  async ngOnInit(): Promise<void> {
-    let uuid = this.route.snapshot.params['uuid'] as string;
+  ngOnInit(): void {
+    const uuid = this.route.snapshot.params['uuid'] as string;
+    this.loadMapByUuid(uuid);
 
+    this.routeParamsSubscription = this.route.params.subscribe((params) => {
+      const nextUuid = params['uuid'] as string;
+      if (nextUuid && nextUuid !== this.currentMapUuid && this.mapReady) {
+        this.loadMapByUuid(nextUuid);
+      }
+    });
+  }
+
+  private async loadMapByUuid(uuid: string): Promise<void> {
     if (uuid === 'new') {
       const newUuid = await this.mapManager.createMap({ name: 'My Trip' });
       this.router.navigate(['/map', newUuid], { replaceUrl: true });
       return;
     }
 
+    const wasKnown = this.mapManager.isMyMap(uuid);
+    const mapInfo = await this.mapManager.fetchMap(uuid);
+
+    if (!mapInfo && wasKnown) {
+      this.mapManager.removeFromMyMaps(uuid);
+      this.snackBar.open('Map not found — it may have been deleted', 'Dismiss', {
+        duration: 6000,
+      });
+      const remaining = this.mapManager.myMaps();
+      const target = remaining.length > 0 ? `/map/${remaining[0].uuid}` : '/map/new';
+      this.router.navigate([target], { replaceUrl: true });
+      return;
+    }
+
     this.currentMapUuid = uuid;
+    this.mapManager.currentMapUuid.set(uuid);
     this.chatService.setMapUuid(uuid);
 
-    const mapInfo = await this.mapManager.fetchMap(uuid);
     if (mapInfo) {
-      if (!this.mapManager.isMyMap(uuid)) {
+      if (!wasKnown) {
         this.mapManager.addToMyMaps(uuid, mapInfo.name);
       }
     } else {
@@ -934,41 +952,9 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  switchToMap(uuid: string): void {
-    this.router.navigate(['/map', uuid]);
-  }
-
-  async createNewMap(): Promise<void> {
-    await this.mapManager.navigateToNewMap();
-  }
-
-  startEditMapName(): void {
-    this.mapNameInput = this.currentMapName;
-    this.editingMapName = true;
-    this.cdr.detectChanges();
-  }
-
-  async saveMapName(): Promise<void> {
-    const trimmed = this.mapNameInput.trim();
-    if (trimmed && trimmed !== this.currentMapName) {
-      await this.mapManager.renameMap(this.currentMapUuid, trimmed);
-      this.cdr.detectChanges();
-    }
-    this.editingMapName = false;
-  }
-
-  cancelEditMapName(): void {
-    this.editingMapName = false;
-  }
-
-  copyShareLink(): void {
-    navigator.clipboard.writeText(window.location.href).catch(() => {
-      prompt('Copy this link to share the map:', window.location.href);
-    });
-  }
-
   ngOnDestroy(): void {
     this.subscription?.unsubscribe();
+    this.routeParamsSubscription?.unsubscribe();
     if (this.syncUrlTimer) clearTimeout(this.syncUrlTimer);
     if (this.hikeRouteDebounceTimer) clearTimeout(this.hikeRouteDebounceTimer);
     if (this.map) {

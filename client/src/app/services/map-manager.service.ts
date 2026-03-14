@@ -24,6 +24,7 @@ export class MapManagerService {
 
   private mapsSignal = signal<MapEntry[]>(this.loadFromStorage());
   readonly myMaps = this.mapsSignal.asReadonly();
+  readonly currentMapUuid = signal<string>('');
 
   private loadFromStorage(): MapEntry[] {
     try {
@@ -79,6 +80,12 @@ export class MapManagerService {
   async renameMap(uuid: string, name: string): Promise<void> {
     await firstValueFrom(this.http.patch(`/api/maps/${uuid}/`, { name }));
     this.updateLocalName(uuid, name);
+  }
+
+  removeFromMyMaps(uuid: string): void {
+    const updated = this.mapsSignal().filter((m) => m.uuid !== uuid);
+    this.mapsSignal.set(updated);
+    this.saveToStorage(updated);
   }
 
   isMyMap(uuid: string): boolean {
