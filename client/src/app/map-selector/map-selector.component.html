@@ -1,59 +1,38 @@
-<button mat-button [matMenuTriggerFor]="mapsMenu" class="map-selector__trigger">
-  <span class="map-selector__name">{{ currentMapName() }}</span>
-  <span class="map-selector__arrow">&#9662;</span>
-</button>
-
-<mat-menu #mapsMenu="matMenu" class="maps-menu">
-  <div class="maps-menu__header" (click)="$event.stopPropagation()">
-    @if (!editingMapName) {
-      <span class="maps-menu__title">{{ currentMapName() }}</span>
-      <button class="maps-menu__action-btn" (click)="startEditMapName()">Rename</button>
-    } @else {
-      <input
-        class="maps-menu__rename-input"
-        [(ngModel)]="mapNameInput"
-        (keydown.enter)="saveMapName()"
-        (keydown.escape)="cancelEditMapName()"
-        (click)="$event.stopPropagation()"
-        autofocus
-      />
-      <button class="maps-menu__action-btn maps-menu__action-btn--save" (click)="saveMapName()">
-        Save
-      </button>
-    }
-  </div>
-  <div class="maps-menu__divider"></div>
-  @for (map of myMaps(); track map.uuid) {
-    <button
-      mat-menu-item
-      (click)="switchToMap(map.uuid)"
-      [class.maps-menu__item--active]="map.uuid === currentMapUuid()"
+<div class="map-selector">
+  <mat-form-field class="map-selector__field" appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Map</mat-label>
+    <mat-select
+      [ngModel]="currentMapUuid()"
+      (ngModelChange)="switchToMap($event)"
+      (keydown)="$event.stopPropagation()"
     >
-      {{ map.name }}
+      @for (map of myMaps(); track map.uuid) {
+        <mat-option [value]="map.uuid">{{ map.name }}</mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <button
+    mat-icon-button
+    [matMenuTriggerFor]="mapsMenu"
+    class="map-selector__actions"
+    type="button"
+  >
+    <mat-icon>more_vert</mat-icon>
+  </button>
+
+  <mat-menu #mapsMenu="matMenu" class="maps-actions-menu">
+    <button mat-menu-item (click)="openNewMapDialog()">
+      <mat-icon>add</mat-icon>
+      <span>New map</span>
     </button>
-  }
-  <div class="maps-menu__divider"></div>
-  @if (!creatingNewMap) {
-    <button mat-menu-item (click)="startCreatingNewMap(); $event.stopPropagation()">
-      + New map
+    <button mat-menu-item (click)="openRenameDialog()">
+      <mat-icon>edit</mat-icon>
+      <span>Rename map</span>
     </button>
-  } @else {
-    <div class="maps-menu__new-map" (click)="$event.stopPropagation()">
-      <input
-        class="maps-menu__rename-input"
-        [(ngModel)]="newMapNameInput"
-        placeholder="Map name"
-        (keydown.enter)="confirmCreateNewMap()"
-        (keydown.escape)="cancelCreatingNewMap()"
-        autofocus
-      />
-      <button
-        class="maps-menu__action-btn maps-menu__action-btn--save"
-        (click)="confirmCreateNewMap()"
-      >
-        Create
-      </button>
-    </div>
-  }
-  <button mat-menu-item (click)="copyShareLink()">&#128279; Copy share link</button>
-</mat-menu>
+    <button mat-menu-item (click)="copyShareLink()">
+      <mat-icon>link</mat-icon>
+      <span>Copy share link</span>
+    </button>
+  </mat-menu>
+</div>

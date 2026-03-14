@@ -2,18 +2,36 @@ import { Component, inject, computed } from '@angular/core';
 import { Router } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog, MatDialogModule } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
+import { MatSelectModule } from '@angular/material/select';
 import { MapManagerService } from '../services/map-manager.service';
+import {
+  MapNameDialogComponent,
+  MapNameDialogData,
+  MapNameDialogResult,
+} from './map-name-dialog.component';
 
 @Component({
   selector: 'app-map-selector',
   templateUrl: './map-selector.component.html',
   styleUrl: './map-selector.component.scss',
-  imports: [MatButtonModule, MatMenuModule, FormsModule],
+  imports: [
+    FormsModule,
+    MatButtonModule,
+    MatDialogModule,
+    MatFormFieldModule,
+    MatIconModule,
+    MatMenuModule,
+    MatSelectModule,
+  ],
 })
 export class MapSelectorComponent {
   private mapManager = inject(MapManagerService);
   private router = inject(Router);
+  private dialog = inject(MatDialog);
 
   readonly myMaps = computed(() => this.mapManager.myMaps());
   readonly currentMapUuid = computed(() => this.mapManager.currentMapUuid());
@@ -21,45 +39,46 @@ export class MapSelectorComponent {
     this.mapManager.getMapName(this.mapManager.currentMapUuid()),
   );
 
-  editingMapName = false;
-  mapNameInput = '';
-  creatingNewMap = false;
-  newMapNameInput = '';
-
-  startEditMapName(): void {
-    this.mapNameInput = this.currentMapName();
-    this.editingMapName = true;
-  }
-
-  async saveMapName(): Promise<void> {
-    const trimmed = this.mapNameInput.trim();
-    if (trimmed && trimmed !== this.currentMapName()) {
-      await this.mapManager.renameMap(this.currentMapUuid(), trimmed);
-    }
-    this.editingMapName = false;
-  }
-
-  cancelEditMapName(): void {
-    this.editingMapName = false;
-  }
-
   switchToMap(uuid: string): void {
     this.router.navigate(['/map', uuid]);
   }
 
-  startCreatingNewMap(): void {
-    this.newMapNameInput = '';
-    this.creatingNewMap = true;
+  openNewMapDialog(): void {
+    const data: MapNameDialogData = { title: 'New map', value: '' };
+    this.dialog
+      .open<MapNameDialogComponent, MapNameDialogData, MapNameDialogResult>(
+        MapNameDialogComponent,
+        { data, width: '340px' },
+      )
+      .afterClosed()
+      .subscribe((result) => {
+        if (result) {
+          this.createMapAndNavigate(result.name);
+        }
+      });
   }
 
-  cancelCreatingNewMap(): void {
-    this.creatingNewMap = false;
+  openRenameDialog(): void {
+    const data: MapNameDialogData = {
+      title: 'Rename map',
+      value: this.currentMapName(),
+    };
+    this.dialog
+      .open<MapNameDialogComponent, MapNameDialogData, MapNameDialogResult>(
+        MapNameDialogComponent,
+        { data, width: '340px' },
+      )
+      .afterClosed()
+      .subscribe((result) => {
+        if (result && result.name.trim() !== this.currentMapName()) {
+          this.mapManager.renameMap(this.currentMapUuid(), result.name.trim());
+        }
+      });
   }
 
-  async confirmCreateNewMap(): Promise<void> {
-    const name = this.newMapNameInput.trim() || 'My Trip';
-    this.creatingNewMap = false;
-    const uuid = await this.mapManager.createMap({ name });
+  private async createMapAndNavigate(name: string): Promise<void> {
+    const trimmed = name.trim() || 'My Trip';
+    const uuid = await this.mapManager.createMap({ name: trimmed });
     this.router.navigate(['/map', uuid]);
   }
 

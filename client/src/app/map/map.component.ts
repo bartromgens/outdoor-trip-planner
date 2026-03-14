@@ -7,7 +7,6 @@ import {
   NgZone,
   ChangeDetectorRef,
   effect,
-  signal,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import * as L from 'leaflet';
@@ -16,7 +15,6 @@ import { Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { FormsModule } from '@angular/forms';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
 import {

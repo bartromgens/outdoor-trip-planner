@@ -106,6 +106,7 @@ def isochrone_valhalla(lat: float, lon: float, api_key: str) -> dict[str, Any]:
             "costing_options": {"pedestrian": VALHALLA_PEDESTRIAN_OPTIONS},
             "contours": contours,
             "polygons": True,
+            "generalize": 0,
         },
         timeout=TIMEOUT,
     )
