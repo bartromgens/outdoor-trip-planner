@@ -5,6 +5,7 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { ChatComponent } from './chat/chat.component';
 import { DepartureDatetimePickerComponent } from './departure-datetime-picker/departure-datetime-picker.component';
 import { MapSelectorComponent } from './map-selector/map-selector.component';
+import { LocationSearchComponent } from './location-search/location-search.component';
 
 @Component({
   selector: 'app-root',
@@ -12,6 +13,7 @@ import { MapSelectorComponent } from './map-selector/map-selector.component';
     RouterOutlet,
     MatToolbarModule,
     MatSidenavModule,
+    LocationSearchComponent,
     ChatComponent,
     DepartureDatetimePickerComponent,
     MapSelectorComponent,

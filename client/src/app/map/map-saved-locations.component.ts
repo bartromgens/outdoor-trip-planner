@@ -14,6 +14,12 @@ import {
   AddLocationDialogComponent,
   type AddLocationDialogResult,
 } from './add-location-dialog.component';
+import {
+  buildSaveLocationPopupContent,
+  handleSaveLocationClick,
+  POPUP_SAVE_BTN_CLASS,
+} from './map-save-popup.helper';
+import { circleMarkerIcon } from './map-marker-icons';
 
 const CATEGORY_COLORS: Record<string, string> = {
   trail: '#e65100',
@@ -34,19 +40,11 @@ function colorForCategory(category?: string): string {
 }
 
 function iconForCategory(category?: string): L.DivIcon {
-  const color = colorForCategory(category);
-  return L.divIcon({
-    className: 'map-marker',
-    html: `<div style="
-      background:${color};
-      width:12px;height:12px;
-      border-radius:50%;
-      border:2px solid #fff;
-      box-shadow:0 1px 3px rgba(0,0,0,.4);
-    "></div>`,
-    iconSize: [16, 16],
-    iconAnchor: [8, 8],
-    popupAnchor: [0, -10],
+  return circleMarkerIcon({
+    color: colorForCategory(category),
+    size: 12,
+    shadow: '0 1px 3px rgba(0,0,0,.4)',
+    border: '2px solid #fff',
   });
 }
 
@@ -289,22 +287,6 @@ export class MapSavedLocationsComponent implements OnDestroy {
     });
   };
 
-  private saveFeature(feature: GeoJSON.Feature, btn: HTMLButtonElement): void {
-    const uuid = this.mapUuid();
-    btn.disabled = true;
-    btn.textContent = 'Saving…';
-    this.locationService
-      .saveFromFeature(uuid, feature)
-      .then(() => {
-        btn.textContent = 'Saved';
-        btn.classList.add('popup-save-btn--saved');
-      })
-      .catch(() => {
-        btn.disabled = false;
-        btn.textContent = 'Save failed – retry';
-      });
-  }
-
   private renderFeatures(fc: GeoJSON.FeatureCollection): void {
     if (!this.map) return;
     if (this.featureLayer) {
@@ -321,20 +303,18 @@ export class MapSavedLocationsComponent implements OnDestroy {
         const label = props['label'] || '';
         const desc = props['description'] || '';
         const cat = props['category'] || '';
-        const parts = [`<b>${label}</b>`];
-        if (cat) parts.push(`<span style="opacity:.6;font-size:12px">${cat}</span>`);
-        if (desc) parts.push(`<div style="margin-top:4px">${desc}</div>`);
-        parts.push(
-          `<div style="margin-top:8px"><button class="popup-save-btn" type="button">Save location</button></div>`,
-        );
-        layer.bindPopup(parts.join('<br>'));
+        layer.bindPopup(buildSaveLocationPopupContent(label, cat, desc));
 
         layer.on('popupopen', (e) => {
           const btn = (e as L.PopupEvent).popup
             .getElement()
-            ?.querySelector<HTMLButtonElement>('.popup-save-btn');
+            ?.querySelector<HTMLButtonElement>(`.${POPUP_SAVE_BTN_CLASS}`);
           if (!btn) return;
-          btn.addEventListener('click', () => this.saveFeature(feature, btn));
+          btn.addEventListener('click', () =>
+            handleSaveLocationClick(this.mapUuid(), feature, btn, this.locationService, () =>
+              this.loadSavedLocations(),
+            ),
+          );
         });
       },
       style: (feature) => {

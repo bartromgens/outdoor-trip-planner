@@ -1,0 +1,13 @@
+.location-search {
+  &__field {
+    width: 280px;
+    margin-right: 8px;
+  }
+
+  &__option-label {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}

@@ -50,6 +50,47 @@ def health_check(request: Request) -> Response:
     return Response({"status": "ok"})
 
 
+STADIA_GEOCODING_BASE = "https://api.stadiamaps.com/geocoding/v1"
+
+
+@api_view(["GET"])
+def geocode_search(request: Request) -> Response:
+    q = request.query_params.get("q", "").strip()
+    if not q:
+        return Response({"results": []})
+
+    api_key = getattr(settings, "VALHALLA_API_KEY", "")
+    if not api_key:
+        logger.warning("Geocode search skipped: VALHALLA_API_KEY not set")
+        return Response({"results": []})
+
+    try:
+        resp = httpx.get(
+            f"{STADIA_GEOCODING_BASE}/search",
+            params={"text": q, "api_key": api_key, "size": 10},
+            timeout=10.0,
+        )
+        resp.raise_for_status()
+        data = resp.json()
+    except httpx.HTTPError as e:
+        logger.warning("Geocode search failed: %s", e)
+        return Response({"results": []})
+
+    features = data.get("features") or []
+    results: list[dict[str, Any]] = []
+    for f in features:
+        geom = f.get("geometry") or {}
+        coords = geom.get("coordinates")
+        props = f.get("properties") or {}
+        if not coords or len(coords) < 2:
+            continue
+        lon, lat = float(coords[0]), float(coords[1])
+        label = props.get("label") or props.get("name") or ""
+        results.append({"label": label, "lat": lat, "lon": lon})
+
+    return Response({"results": results})
+
+
 @api_view(["POST"])
 def chat(request: Request) -> Response:
     messages = request.data.get("messages", [])

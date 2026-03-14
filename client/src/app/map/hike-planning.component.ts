@@ -5,6 +5,7 @@ import { MatDialog } from '@angular/material/dialog';
 import { TransportService, type HikeDirectionsResult } from '../services/transport.service';
 import { HikeRouteService, type SavedHikeRoute } from '../services/hike-route.service';
 import { SaveHikeDialogComponent, type SaveHikeDialogResult } from './save-hike-dialog.component';
+import { circleMarkerIcon } from './map-marker-icons';
 
 type WaypointRole = 'start' | 'end' | 'mid';
 
@@ -15,20 +16,13 @@ const WAYPOINT_COLORS: Record<WaypointRole, string> = {
 };
 
 function waypointIcon(role: WaypointRole): L.DivIcon {
-  const color = WAYPOINT_COLORS[role];
-  return L.divIcon({
-    className: 'map-marker',
-    html: `<div style="
-      background:${color};
-      width:14px;height:14px;
-      border-radius:50%;
-      border:2.5px solid #fff;
-      box-shadow:0 2px 4px rgba(0,0,0,.45);
-      cursor:grab;
-    "></div>`,
-    iconSize: [19, 19],
-    iconAnchor: [9, 9],
+  return circleMarkerIcon({
+    color: WAYPOINT_COLORS[role],
+    size: 14,
+    shadow: '0 2px 4px rgba(0,0,0,.45)',
+    border: '2.5px solid #fff',
     popupAnchor: [0, -12],
+    extraStyle: 'cursor:grab',
   });
 }
 

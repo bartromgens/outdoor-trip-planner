@@ -1,0 +1,27 @@
+<div class="location-search">
+  <mat-form-field class="location-search__field" appearance="outline" subscriptSizing="dynamic">
+    <mat-label>Search location</mat-label>
+    <input
+      matInput
+      [formControl]="searchControl"
+      (input)="onInput()"
+      [matAutocomplete]="auto"
+      placeholder="Place or address"
+    />
+    <mat-icon matPrefix>search</mat-icon>
+    @if (loading()) {
+      <mat-spinner matSuffix diameter="20"></mat-spinner>
+    }
+    <mat-autocomplete
+      #auto="matAutocomplete"
+      [displayWith]="displayLabel"
+      (optionSelected)="onSelect($event.option.value)"
+    >
+      @for (result of results(); track result.label + result.lat + result.lon) {
+        <mat-option [value]="result">
+          <span class="location-search__option-label">{{ result.label }}</span>
+        </mat-option>
+      }
+    </mat-autocomplete>
+  </mat-form-field>
+</div>

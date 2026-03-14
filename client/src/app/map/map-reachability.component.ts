@@ -8,6 +8,7 @@ import {
 } from '../services/transport.service';
 import { LocationService, type SavedLocation } from '../services/location.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
+import { circleMarkerIcon } from './map-marker-icons';
 
 const CACHE_USE_RADIUS_M = 500;
 
@@ -64,26 +65,17 @@ const ISOCHRONE_BUCKETS: IsochroneBucket[] = [
 const ISOCHRONE_DISCLAIMER =
   'Approximate — elevation gain/loss not modelled. Actual hiking time in steep terrain will be longer.';
 
-function reachabilityColor(bucketMinutes: number): string {
-  const t = Math.min(1, Math.max(0, (bucketMinutes - 15) / 45));
-  const lightness = Math.round(62 - t * 38);
+function reachabilityColor(durationMin: number): string {
+  const t = Math.min(1, Math.max(0, (durationMin - 15) / 45));
+  const lightness = 62 - t * 38;
   return `hsl(122, 62%, ${lightness}%)`;
 }
 
-function reachabilityIcon(bucket: number): L.DivIcon {
-  const color = reachabilityColor(bucket);
-  return L.divIcon({
-    className: 'map-marker',
-    html: `<div style="
-      background:${color};
-      width:13px;height:13px;
-      border-radius:50%;
-      border:2px solid rgba(255,255,255,0.85);
-      box-shadow:0 1px 4px rgba(0,0,0,.45);
-    "></div>`,
-    iconSize: [17, 17],
-    iconAnchor: [8, 8],
-    popupAnchor: [0, -10],
+function reachabilityIcon(durationMin: number): L.DivIcon {
+  return circleMarkerIcon({
+    color: reachabilityColor(durationMin),
+    size: 13,
+    border: '2px solid rgba(255,255,255,0.85)',
   });
 }
 
@@ -308,7 +300,7 @@ export class MapReachabilityComponent {
     const markers = features.map((f) => {
       const [lon, lat] = f.geometry.coordinates as [number, number];
       const props = f.properties;
-      const marker = L.marker([lat, lon], { icon: reachabilityIcon(props.bucket) });
+      const marker = L.marker([lat, lon], { icon: reachabilityIcon(props.duration_min) });
       const transferText =
         props.transfers === 0
           ? 'Direct'

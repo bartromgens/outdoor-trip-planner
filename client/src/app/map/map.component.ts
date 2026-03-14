@@ -17,12 +17,20 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ChatService } from '../services/chat.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
 import { MapManagerService } from '../services/map-manager.service';
+import { LocationSearchService, type GeocodeResult } from '../services/location-search.service';
+import { LocationService } from '../services/location.service';
 import type { BoundingBox } from '../services/chat.service';
+import {
+  buildSaveLocationPopupContent,
+  handleSaveLocationClick,
+  POPUP_SAVE_BTN_CLASS,
+} from './map-save-popup.helper';
 import { environment } from '../../environments/environment';
 import { MapControlsComponent } from './map-controls.component';
 import { HikePlanningComponent } from './hike-planning.component';
 import { MapReachabilityComponent } from './map-reachability.component';
 import { MapSavedLocationsComponent } from './map-saved-locations.component';
+import { circleMarkerIcon } from './map-marker-icons';
 
 interface ContourConfig {
   level: number;
@@ -114,6 +122,9 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private urlOverlays: string[] | null = null;
   private mapReady = false;
   private syncUrlTimer: ReturnType<typeof setTimeout> | null = null;
+  private searchResultMarker: L.Marker | null = null;
+  private locationSearch = inject(LocationSearchService);
+  private locationService = inject(LocationService);
 
   currentMapUuid = '';
   addingLocation = false;
@@ -122,6 +133,10 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     effect(() => {
       this.tripDateTime.departureTime();
       if (this.mapReady) this.debouncedSyncUrl();
+    });
+    effect(() => {
+      const result = this.locationSearch.resultToShow();
+      if (result && this.mapReady && this.map) this.showSearchResult(result);
     });
   }
 
@@ -214,6 +229,9 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.loadContourLayers();
     this.mapReady = true;
+
+    const pendingSearch = this.locationSearch.resultToShow();
+    if (pendingSearch) this.showSearchResult(pendingSearch);
 
     if (this.currentMapUuid) {
       this.savedLocationsComp.loadSavedLocations();
@@ -376,9 +394,45 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     this.debouncedSyncUrl();
   }
 
+  private showSearchResult(result: GeocodeResult): void {
+    if (this.searchResultMarker) {
+      this.map.removeLayer(this.searchResultMarker);
+      this.searchResultMarker = null;
+    }
+    const latlng: L.LatLngExpression = [result.lat, result.lon];
+    const feature: GeoJSON.Feature<GeoJSON.Point> = {
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [result.lon, result.lat] },
+      properties: { label: result.label },
+    };
+    const popupContent = buildSaveLocationPopupContent(result.label);
+    this.searchResultMarker = L.marker(latlng, {
+      icon: circleMarkerIcon({ color: '#1976d2', size: 14 }),
+    })
+      .bindPopup(popupContent, { className: 'search-result-popup' })
+      .addTo(this.map);
+    this.searchResultMarker.on('popupopen', (e: L.PopupEvent) => {
+      const btn = e.popup
+        .getElement()
+        ?.querySelector<HTMLButtonElement>(`.${POPUP_SAVE_BTN_CLASS}`);
+      if (!btn) return;
+      btn.addEventListener('click', () =>
+        handleSaveLocationClick(this.currentMapUuid, feature, btn, this.locationService, () =>
+          this.savedLocationsComp.loadSavedLocations(),
+        ),
+      );
+    });
+    this.searchResultMarker.openPopup();
+    this.map.setView(latlng, Math.max(this.map.getZoom(), 14), { animate: true });
+    this.locationSearch.clearResultToShow();
+  }
+
   ngOnDestroy(): void {
     this.routeParamsSubscription?.unsubscribe();
     if (this.syncUrlTimer) clearTimeout(this.syncUrlTimer);
+    if (this.searchResultMarker && this.map) {
+      this.map.removeLayer(this.searchResultMarker);
+    }
     if (this.map) {
       this.map.remove();
     }
