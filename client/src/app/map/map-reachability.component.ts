@@ -1,4 +1,12 @@
-import { Component, inject, output, NgZone, ChangeDetectorRef } from '@angular/core';
+import {
+  Component,
+  inject,
+  input,
+  output,
+  signal,
+  NgZone,
+  ChangeDetectorRef,
+} from '@angular/core';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import {
@@ -6,7 +14,39 @@ import {
   type HikeIsochroneResult,
   type ReachabilityStop,
 } from '../services/transport.service';
+import { LocationService, type SavedLocation } from '../services/location.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
+
+const CACHE_USE_RADIUS_M = 500;
+
+function distanceMeters(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
+  const R = 6_371_000;
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function findLocationWithinRadius(
+  locations: SavedLocation[],
+  lat: number,
+  lng: number,
+  radiusM: number,
+): SavedLocation | undefined {
+  return locations.find(
+    (loc) => distanceMeters(lat, lng, loc.latitude, loc.longitude) <= radiusM,
+  );
+}
 
 interface IsochroneBucket {
   seconds: number;
@@ -75,10 +115,12 @@ function formatDepartureTime(isoUtc: string): string {
 })
 export class MapReachabilityComponent {
   private transportService = inject(TransportService);
+  private locationService = inject(LocationService);
   private tripDateTime = inject(TripDateTimeService);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
 
+  mapUuid = input.required<string>();
   hikingRangesCleared = output<void>();
 
   private map!: L.Map;
@@ -89,10 +131,7 @@ export class MapReachabilityComponent {
   reachabilityLoading = false;
   isochroneLoading = false;
   rangeLoading = false;
-
-  get hasHikingRanges(): boolean {
-    return !!this.isochroneLayer;
-  }
+  readonly hasHikingRanges = signal(false);
 
   get reachabilityLoadingText(): string {
     return this.tripDateTime.departureTime()
@@ -111,6 +150,7 @@ export class MapReachabilityComponent {
     this.layerControl.removeLayer(this.isochroneLayer);
     this.map.removeLayer(this.isochroneLayer);
     this.isochroneLayer = undefined;
+    this.hasHikingRanges.set(false);
     this.hikingRangesCleared.emit();
     this.cdr.detectChanges();
   }
@@ -129,8 +169,9 @@ export class MapReachabilityComponent {
     } catch (e) {
       console.error('Failed to load saved location range data', e);
     } finally {
-      this.rangeLoading = false;
-      this.cdr.detectChanges();
+      this.deferDetectChanges(() => {
+        this.rangeLoading = false;
+      });
     }
   }
 
@@ -198,8 +239,9 @@ export class MapReachabilityComponent {
     } catch {
       console.error('Failed to load reachability data');
     } finally {
-      this.reachabilityLoading = false;
-      this.cdr.detectChanges();
+      this.deferDetectChanges(() => {
+        this.reachabilityLoading = false;
+      });
     }
   }
 
@@ -207,14 +249,33 @@ export class MapReachabilityComponent {
     this.isochroneLoading = true;
     this.cdr.detectChanges();
     try {
-      const result = await this.transportService.getHikeIsochrone(lat, lng);
+      const mapUuid = this.mapUuid();
+      const locations = mapUuid ? await this.locationService.getAll(mapUuid) : [];
+      const cachedLoc = findLocationWithinRadius(
+        locations,
+        lat,
+        lng,
+        CACHE_USE_RADIUS_M,
+      );
+      const result = cachedLoc
+        ? await this.transportService.getLocationHikeIsochrone(
+            mapUuid,
+            cachedLoc.id,
+          )
+        : await this.transportService.getHikeIsochrone(lat, lng);
       this.renderIsochroneLayer(result);
     } catch {
       console.error('Failed to load hike isochrone data');
     } finally {
-      this.isochroneLoading = false;
-      this.cdr.detectChanges();
+      this.deferDetectChanges(() => {
+        this.isochroneLoading = false;
+      });
     }
+  }
+
+  private deferDetectChanges(update: () => void): void {
+    update();
+    setTimeout(() => this.cdr.detectChanges(), 0);
   }
 
   private renderIsochroneLayer(result: HikeIsochroneResult): void {
@@ -247,6 +308,7 @@ export class MapReachabilityComponent {
 
     this.isochroneLayer = L.layerGroup(layers).addTo(this.map);
     this.layerControl.addOverlay(this.isochroneLayer, 'Hike isochrones');
+    this.hasHikingRanges.set(true);
   }
 
   private renderReachabilityLayer(

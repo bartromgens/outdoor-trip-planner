@@ -1,10 +1,21 @@
 .toolbar-white {
   background-color: white;
   color: rgba(0, 0, 0, 0.87);
+  min-height: 72px;
+  padding: 8px 16px;
+  box-sizing: border-box;
+
+  .mat-toolbar-row,
+  .mat-toolbar-single-row {
+    height: auto;
+    min-height: 56px;
+    padding: 0;
+    align-items: center;
+  }
 }
 
 .sidenav-container {
-  height: calc(100vh - 64px);
+  height: calc(100vh - 72px);
 }
 
 mat-sidenav {

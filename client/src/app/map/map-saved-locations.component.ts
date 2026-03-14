@@ -11,6 +11,7 @@ import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import { Subscription } from 'rxjs';
 import { MatDialog } from '@angular/material/dialog';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
 import {
@@ -84,6 +85,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
   private chatService = inject(ChatService);
   private locationService = inject(LocationService);
   private dialog = inject(MatDialog);
+  private snackBar = inject(MatSnackBar);
   private ngZone = inject(NgZone);
   private cdr = inject(ChangeDetectorRef);
 
@@ -107,14 +109,18 @@ export class MapSavedLocationsComponent implements OnDestroy {
   }
 
   toggleAddLocation(): void {
-    this.addingLocation = !this.addingLocation;
-    if (!this.addingLocation) {
-      this.map.off('click', this.addLocationClickHandler);
-    } else {
+    const next = !this.addingLocation;
+    this.ngZone.runOutsideAngular(() => {
       setTimeout(() => {
-        this.map.once('click', this.addLocationClickHandler);
+        this.addingLocation = next;
+        if (!next) {
+          this.map.off('click', this.addLocationClickHandler);
+        } else {
+          this.map.once('click', this.addLocationClickHandler);
+        }
+        this.ngZone.run(() => this.cdr.detectChanges());
       }, 0);
-    }
+    });
   }
 
   async loadSavedLocations(): Promise<void> {
@@ -129,7 +135,10 @@ export class MapSavedLocationsComponent implements OnDestroy {
       this.savedLayer = L.geoJSON(fc, {
         pointToLayer: (_feature, latlng) => {
           const cat = _feature.properties?.['category'];
-          return L.marker(latlng, { icon: savedIconForCategory(cat) });
+          return L.marker(latlng, {
+            icon: savedIconForCategory(cat),
+            draggable: true,
+          });
         },
         onEachFeature: (feature, layer) => {
           const props = feature.properties || {};
@@ -143,10 +152,31 @@ export class MapSavedLocationsComponent implements OnDestroy {
             parts.push(`<span style="font-size:12px">Altitude: ${altitude} m</span>`);
           if (cat) parts.push(`<span style="opacity:.6;font-size:12px">${cat}</span>`);
           if (desc) parts.push(`<div style="margin-top:4px">${desc}</div>`);
+          if (locationId != null) {
+            parts.push(
+              `<div style="margin-top:8px"><button class="saved-location-delete-btn" type="button"><span class="material-icons">delete</span>Delete</button></div>`,
+            );
+          }
           layer.bindPopup(parts.join('<br>'));
           if (locationId != null) {
             layer.on('click', () => {
               this.ngZone.run(() => this.locationRangesRequested.emit(locationId as number));
+            });
+            layer.on('popupopen', (e: L.PopupEvent) => {
+              const btn = e.popup
+                .getElement()
+                ?.querySelector<HTMLButtonElement>('.saved-location-delete-btn');
+              if (!btn) return;
+              const handler = () => this.deleteSavedLocation(locationId, layer);
+              btn.addEventListener('click', handler);
+              layer.once('popupclose', () => btn.removeEventListener('click', handler));
+            });
+            layer.on('dragend', (e: L.LeafletEvent) => {
+              const marker = e.target as L.Marker;
+              const { lat, lng } = marker.getLatLng();
+              this.ngZone.run(() =>
+                this.updateSavedLocationPosition(locationId, lat, lng, feature),
+              );
             });
           }
         },
@@ -164,10 +194,42 @@ export class MapSavedLocationsComponent implements OnDestroy {
     this.subscription?.unsubscribe();
   }
 
+  private deleteSavedLocation(locationId: number, layer: L.Layer): void {
+    const uuid = this.mapUuid();
+    this.locationService
+      .delete(uuid, locationId)
+      .then(() => {
+        if (this.savedLayer) {
+          this.savedLayer.removeLayer(layer);
+        }
+        this.snackBar.open('Location deleted', 'Dismiss', { duration: 3000 });
+      })
+      .catch((err) => console.error('Failed to delete location', err));
+  }
+
+  private updateSavedLocationPosition(
+    locationId: number,
+    lat: number,
+    lng: number,
+    feature: GeoJSON.Feature,
+  ): void {
+    const uuid = this.mapUuid();
+    this.locationService
+      .updatePosition(uuid, locationId, lat, lng)
+      .then(() => {
+        if (feature.geometry?.type === 'Point') {
+          (feature.geometry as GeoJSON.Point).coordinates = [lng, lat];
+        }
+      })
+      .catch((err) => console.error('Failed to update location position', err));
+  }
+
   private addLocationClickHandler = (e: L.LeafletMouseEvent): void => {
     const { lat, lng } = e.latlng;
-    this.addingLocation = false;
-    this.cdr.detectChanges();
+    this.ngZone.runOutsideAngular(() => {
+      this.addingLocation = false;
+      this.ngZone.run(() => this.cdr.detectChanges());
+    });
     this.ngZone.run(() => {
       const ref = this.dialog.open(AddLocationDialogComponent, {
         data: { lat, lng },

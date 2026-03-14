@@ -157,4 +157,24 @@ export class LocationService {
       this.http.post<SavedLocation>(`/api/maps/${mapUuid}/locations/`, payload),
     );
   }
+
+  async delete(mapUuid: string, locationId: number): Promise<void> {
+    return firstValueFrom(
+      this.http.delete<void>(`/api/maps/${mapUuid}/locations/${locationId}/`),
+    );
+  }
+
+  async updatePosition(
+    mapUuid: string,
+    locationId: number,
+    lat: number,
+    lng: number,
+  ): Promise<SavedLocation> {
+    return firstValueFrom(
+      this.http.put<SavedLocation>(
+        `/api/maps/${mapUuid}/locations/${locationId}/`,
+        { latitude: lat, longitude: lng, coordinates: [lng, lat] },
+      ),
+    );
+  }
 }

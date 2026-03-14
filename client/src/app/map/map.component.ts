@@ -137,7 +137,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    const urlParams = this.readUrlParams();W
+    const urlParams = this.readUrlParams();
 
     this.map = L.map('map').setView(
       [urlParams.lat ?? 46.8182, urlParams.lng ?? 8.2275],
@@ -349,7 +349,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onAddLocationToggle(): void {
-    setTimeout(() => this.savedLocationsComp.toggleAddLocation(), 0);
+    this.savedLocationsComp.toggleAddLocation();
   }
 
   onHikePlanningToggle(): void {

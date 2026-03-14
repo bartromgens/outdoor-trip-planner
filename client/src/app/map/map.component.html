@@ -6,6 +6,7 @@
 
 <app-map-reachability
   #reachability
+  [mapUuid]="currentMapUuid"
   (hikingRangesCleared)="onHikingRangesCleared()"
 ></app-map-reachability>
 <app-hike-planning #hikePlanning [mapUuid]="currentMapUuid"></app-hike-planning>
@@ -18,7 +19,7 @@
 <app-map-controls
   [addingLocation]="savedLocations.addingLocation"
   [hikePlanningActive]="hikePlanning.hikePlanningActive"
-  [hasHikingRanges]="reachability.hasHikingRanges"
+  [hasHikingRanges]="reachability.hasHikingRanges()"
   [hikeRouteLayer]="hikePlanning.hikeRouteLayer"
   [editingRouteId]="hikePlanning.editingRouteId"
   [hikeLoading]="hikePlanning.hikeLoading"

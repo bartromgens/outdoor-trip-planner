@@ -121,3 +121,26 @@
     background: #388e3c;
   }
 }
+
+/* Saved location popup delete button – rendered in Leaflet DOM */
+:host ::ng-deep .saved-location-delete-btn {
+  background: #c62828;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+
+  .material-icons {
+    font-family: 'Material Icons';
+    font-size: 16px;
+    margin-right: 4px;
+  }
+
+  &:hover {
+    background: #b71c1c;
+  }
+}
