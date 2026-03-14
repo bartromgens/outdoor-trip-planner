@@ -45,6 +45,9 @@ const CONTOUR_CONFIGS: ContourConfig[] = [
 const THUNDERFOREST_ATTRIBUTION =
   '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://www.thunderforest.com/">Thunderforest</a>';
 
+const TRACESTRACK_ATTRIBUTION =
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://www.tracestrack.com/">Tracestrack</a>';
+
 function buildThunderforestLayer(style: string): L.TileLayer | null {
   const key = environment.thunderforestApiKey;
   if (!key) return null;
@@ -52,6 +55,20 @@ function buildThunderforestLayer(style: string): L.TileLayer | null {
     attribution: THUNDERFOREST_ATTRIBUTION,
     maxZoom: 22,
   });
+}
+
+function buildTracestrackTopoLayer(): L.TileLayer | null {
+  const key = environment.tracestrackApiKey;
+  if (!key) return null;
+  return L.tileLayer(
+    `https://tile.tracestrack.com/topo__/{z}/{x}/{y}.png?key=${encodeURIComponent(key)}`,
+    {
+      attribution: TRACESTRACK_ATTRIBUTION,
+      maxZoom: 19,
+      tileSize: 512,
+      zoomOffset: -1,
+    },
+  );
 }
 
 function buildTransportLayer(): L.TileLayer {
@@ -120,7 +137,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    const urlParams = this.readUrlParams();
+    const urlParams = this.readUrlParams();W
 
     this.map = L.map('map').setView(
       [urlParams.lat ?? 46.8182, urlParams.lng ?? 8.2275],
@@ -145,13 +162,15 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const landscapeLayer = buildThunderforestLayer('landscape');
     const outdoorsLayer = buildThunderforestLayer('outdoors');
+    const tracestrackTopoLayer = buildTracestrackTopoLayer();
 
     const baseLayerConfig: Record<string, L.Layer> = {
       Standard: osmLayer,
-      Transport: transportLayer,
       Satellite: satelliteLayer,
+      Transport: transportLayer,
       ...(landscapeLayer && { Landscape: landscapeLayer }),
       ...(outdoorsLayer && { Outdoors: outdoorsLayer }),
+      ...(tracestrackTopoLayer && { Topo: tracestrackTopoLayer }),
     };
     for (const [name, layer] of Object.entries(baseLayerConfig)) {
       this.baseLayers.set(name, layer);
@@ -327,6 +346,14 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
         // Silently skip unavailable contour levels
       }
     }
+  }
+
+  onAddLocationToggle(): void {
+    setTimeout(() => this.savedLocationsComp.toggleAddLocation(), 0);
+  }
+
+  onHikePlanningToggle(): void {
+    setTimeout(() => this.hikePlanningComp.toggleHikePlanning(), 0);
   }
 
   onLocationRangesRequested(locationId: number): void {
