@@ -114,7 +114,18 @@ export class TransportService {
     const url = `/api/maps/${mapUuid}/locations/${locationId}/reachability/${qs ? `?${qs}` : ''}`;
     const resp = await fetch(url);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    return resp.json() as Promise<ReachabilityResult>;
+    const result = (await resp.json()) as ReachabilityResult;
+    if (result.query_datetime && result.features?.length) {
+      const bestTime = result.query_datetime;
+      result.features = result.features.map((f) => ({
+        ...f,
+        properties: {
+          ...f.properties,
+          best_time: f.properties.best_time ?? bestTime,
+        },
+      }));
+    }
+    return result;
   }
 
   async getReachabilityOptimal(
