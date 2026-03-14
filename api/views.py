@@ -188,14 +188,17 @@ def contour(request: Request, elevation: int) -> Response:
     return response
 
 
+DEFAULT_REACHABILITY_DATETIME = datetime(2026, 6, 23, 7, 0, 0, tzinfo=timezone.UTC)
+
+
 def _parse_query_datetime(time_str: str | None) -> datetime:
     if not time_str:
-        return timezone.now()
+        return DEFAULT_REACHABILITY_DATETIME
     s = time_str.replace("Z", "+00:00")
     try:
         return datetime.fromisoformat(s)
     except ValueError:
-        return timezone.now()
+        return DEFAULT_REACHABILITY_DATETIME
 
 
 def _fetch_reachability(
@@ -211,9 +214,8 @@ def _fetch_reachability(
         "maxTravelTime": max_travel_time,
         "maxMatchingDistance": 150,
         "maxTransfers": 3,
+        "time": query_datetime.isoformat(),
     }
-    if time_str:
-        params["time"] = time_str
     resp = httpx.get(
         f"{TRANSITOUS_BASE}/api/v1/one-to-all",
         params=params,

@@ -177,4 +177,24 @@ export class LocationService {
       ),
     );
   }
+
+  async updateDetails(
+    mapUuid: string,
+    locationId: number,
+    details: { name: string; category: string; description?: string },
+  ): Promise<SavedLocation> {
+    const body: Record<string, string> = {
+      name: details.name,
+      category: details.category,
+    };
+    if (details.description !== undefined) {
+      body['description'] = details.description;
+    }
+    return firstValueFrom(
+      this.http.put<SavedLocation>(
+        `/api/maps/${mapUuid}/locations/${locationId}/`,
+        body,
+      ),
+    );
+  }
 }

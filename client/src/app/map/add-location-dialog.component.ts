@@ -7,8 +7,12 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 
 export interface AddLocationDialogData {
-  lat: number;
-  lng: number;
+  lat?: number;
+  lng?: number;
+  title?: string;
+  initialName?: string;
+  initialCategory?: string;
+  initialDescription?: string;
 }
 
 export interface AddLocationDialogResult {
@@ -41,9 +45,11 @@ const CATEGORIES = [
     MatButtonModule,
   ],
   template: `
-    <h2 mat-dialog-title>Add location</h2>
+    <h2 mat-dialog-title>{{ dialogTitle }}</h2>
     <mat-dialog-content>
-      <p class="coords">{{ data.lat.toFixed(5) }}, {{ data.lng.toFixed(5) }}</p>
+      @if (data.lat != null && data.lng != null) {
+        <p class="coords">{{ data.lat.toFixed(5) }}, {{ data.lng.toFixed(5) }}</p>
+      }
       <form [formGroup]="form" id="add-location-form" (ngSubmit)="submit()">
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Name</mat-label>
@@ -94,11 +100,15 @@ export class AddLocationDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<AddLocationDialogComponent>);
 
   readonly categories = CATEGORIES;
+  readonly dialogTitle = this.data.title ?? 'Add location';
 
   readonly form = new FormGroup({
-    name: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
-    category: new FormControl('', { nonNullable: true }),
-    description: new FormControl('', { nonNullable: true }),
+    name: new FormControl(this.data.initialName ?? '', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
+    category: new FormControl(this.data.initialCategory ?? '', { nonNullable: true }),
+    description: new FormControl(this.data.initialDescription ?? '', { nonNullable: true }),
   });
 
   submit(): void {

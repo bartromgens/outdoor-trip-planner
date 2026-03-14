@@ -154,7 +154,10 @@ export class MapSavedLocationsComponent implements OnDestroy {
           if (desc) parts.push(`<div style="margin-top:4px">${desc}</div>`);
           if (locationId != null) {
             parts.push(
-              `<div style="margin-top:8px"><button class="saved-location-delete-btn" type="button"><span class="material-icons">delete</span>Delete</button></div>`,
+              '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
+                '<button class="saved-location-edit-btn" type="button" style="background:#1976d2;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">Edit</button>' +
+                '<button class="saved-location-delete-btn" type="button" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">Delete</button>' +
+              '</div>',
             );
           }
           layer.bindPopup(parts.join('<br>'));
@@ -163,13 +166,19 @@ export class MapSavedLocationsComponent implements OnDestroy {
               this.ngZone.run(() => this.locationRangesRequested.emit(locationId as number));
             });
             layer.on('popupopen', (e: L.PopupEvent) => {
-              const btn = e.popup
-                .getElement()
-                ?.querySelector<HTMLButtonElement>('.saved-location-delete-btn');
-              if (!btn) return;
-              const handler = () => this.deleteSavedLocation(locationId, layer);
-              btn.addEventListener('click', handler);
-              layer.once('popupclose', () => btn.removeEventListener('click', handler));
+              const popupEl = e.popup.getElement();
+              const deleteBtn = popupEl?.querySelector<HTMLButtonElement>('.saved-location-delete-btn');
+              const editBtn = popupEl?.querySelector<HTMLButtonElement>('.saved-location-edit-btn');
+              const onClose = () => {
+                deleteBtn?.removeEventListener('click', deleteHandler);
+                editBtn?.removeEventListener('click', editHandler);
+              };
+              const deleteHandler = () => this.deleteSavedLocation(locationId, layer);
+              const editHandler = () =>
+                this.openEditLocationDialog(locationId, label, cat, desc ?? '', layer);
+              deleteBtn?.addEventListener('click', deleteHandler);
+              editBtn?.addEventListener('click', editHandler);
+              layer.once('popupclose', onClose);
             });
             layer.on('dragend', (e: L.LeafletEvent) => {
               const marker = e.target as L.Marker;
@@ -192,6 +201,42 @@ export class MapSavedLocationsComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.subscription?.unsubscribe();
+  }
+
+  private openEditLocationDialog(
+    locationId: number,
+    name: string,
+    category: string,
+    description: string,
+    layer: L.Layer,
+  ): void {
+    const ref = this.dialog.open(AddLocationDialogComponent, {
+      data: {
+        title: 'Edit location',
+        initialName: name,
+        initialCategory: category,
+        initialDescription: description,
+      },
+      width: '360px',
+    });
+    ref.afterClosed().subscribe((result: AddLocationDialogResult | undefined) => {
+      if (!result) return;
+      const uuid = this.mapUuid();
+      this.locationService
+        .updateDetails(uuid, locationId, {
+          name: result.name,
+          category: result.category,
+          description: result.description,
+        })
+        .then(() => {
+          (layer as L.Marker).closePopup();
+          return this.loadSavedLocations();
+        })
+        .then(() =>
+          this.snackBar.open('Location updated', 'Dismiss', { duration: 3000 }),
+        )
+        .catch((err) => console.error('Failed to update location', err));
+    });
   }
 
   private deleteSavedLocation(locationId: number, layer: L.Layer): void {

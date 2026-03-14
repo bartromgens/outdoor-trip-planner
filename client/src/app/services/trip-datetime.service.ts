@@ -5,7 +5,7 @@ export class TripDateTimeService {
   private readonly _departureTime = signal<Date | null>(null);
   readonly departureTime = this._departureTime.asReadonly();
 
-  private static readonly DEFAULT_DEPARTURE = new Date('2026-06-23T09:30:00');
+  private static readonly DEFAULT_DEPARTURE = new Date('2026-06-23T07:00:00Z');
 
   constructor() {
     const raw = new URLSearchParams(window.location.search).get('departure');
