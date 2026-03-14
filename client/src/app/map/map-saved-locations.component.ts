@@ -3,8 +3,8 @@ import {
   inject,
   input,
   output,
+  effect,
   NgZone,
-  ChangeDetectorRef,
   OnDestroy,
 } from '@angular/core';
 import * as L from 'leaflet';
@@ -87,39 +87,35 @@ export class MapSavedLocationsComponent implements OnDestroy {
   private dialog = inject(MatDialog);
   private snackBar = inject(MatSnackBar);
   private ngZone = inject(NgZone);
-  private cdr = inject(ChangeDetectorRef);
 
   mapUuid = input.required<string>();
+  addingLocation = input<boolean>(false);
+  addingLocationChange = output<boolean>();
 
   private map!: L.Map;
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
   private subscription?: Subscription;
 
-  addingLocation = false;
-
   locationRangesRequested = output<number>();
+
+  constructor() {
+    effect(() => {
+      const adding = this.addingLocation();
+      if (!this.map) return;
+      if (adding) {
+        this.map.once('click', this.addLocationClickHandler);
+      } else {
+        this.map.off('click', this.addLocationClickHandler);
+      }
+    });
+  }
 
   init(map: L.Map): void {
     this.map = map;
     this.subscription = this.chatService.mapFeatures$.subscribe((fc) => {
       if (!fc) return;
       this.renderFeatures(fc);
-    });
-  }
-
-  toggleAddLocation(): void {
-    const next = !this.addingLocation;
-    this.ngZone.runOutsideAngular(() => {
-      setTimeout(() => {
-        this.addingLocation = next;
-        if (!next) {
-          this.map.off('click', this.addLocationClickHandler);
-        } else {
-          this.map.once('click', this.addLocationClickHandler);
-        }
-        this.ngZone.run(() => this.cdr.detectChanges());
-      }, 0);
     });
   }
 
@@ -201,6 +197,9 @@ export class MapSavedLocationsComponent implements OnDestroy {
 
   ngOnDestroy(): void {
     this.subscription?.unsubscribe();
+    if (this.map) {
+      this.map.off('click', this.addLocationClickHandler);
+    }
   }
 
   private openEditLocationDialog(
@@ -271,11 +270,8 @@ export class MapSavedLocationsComponent implements OnDestroy {
 
   private addLocationClickHandler = (e: L.LeafletMouseEvent): void => {
     const { lat, lng } = e.latlng;
-    this.ngZone.runOutsideAngular(() => {
-      this.addingLocation = false;
-      this.ngZone.run(() => this.cdr.detectChanges());
-    });
     this.ngZone.run(() => {
+      this.addingLocationChange.emit(false);
       const ref = this.dialog.open(AddLocationDialogComponent, {
         data: { lat, lng },
         width: '360px',

@@ -116,6 +116,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private syncUrlTimer: ReturnType<typeof setTimeout> | null = null;
 
   currentMapUuid = '';
+  addingLocation = false;
 
   constructor() {
     effect(() => {
@@ -349,7 +350,11 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onAddLocationToggle(): void {
-    this.savedLocationsComp.toggleAddLocation();
+    this.addingLocation = !this.addingLocation;
+  }
+
+  onAddingLocationChange(value: boolean): void {
+    this.addingLocation = value;
   }
 
   onHikePlanningToggle(): void {

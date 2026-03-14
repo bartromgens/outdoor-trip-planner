@@ -1,6 +1,6 @@
 <div
   id="map"
-  [class.map--adding]="savedLocations.addingLocation"
+  [class.map--adding]="addingLocation"
   [class.map--hike-planning]="hikePlanning.hikePlanningActive"
 ></div>
 
@@ -13,11 +13,13 @@
 <app-map-saved-locations
   #savedLocations
   [mapUuid]="currentMapUuid"
+  [addingLocation]="addingLocation"
+  (addingLocationChange)="onAddingLocationChange($event)"
   (locationRangesRequested)="onLocationRangesRequested($event)"
 ></app-map-saved-locations>
 
 <app-map-controls
-  [addingLocation]="savedLocations.addingLocation"
+  [addingLocation]="addingLocation"
   [hikePlanningActive]="hikePlanning.hikePlanningActive"
   [hasHikingRanges]="reachability.hasHikingRanges()"
   [hikeRouteLayer]="hikePlanning.hikeRouteLayer"
