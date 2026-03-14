@@ -1,22 +1,22 @@
-// CSS token overrides to render form-fields white inside a primary toolbar
-$white-full: white;
-$white-mid: rgba(255, 255, 255, 0.6);
-$white-low: rgba(255, 255, 255, 0.35);
+// CSS token overrides for form-fields on white toolbar
+$dark-full: rgba(0, 0, 0, 0.87);
+$dark-mid: rgba(0, 0, 0, 0.6);
+$dark-low: rgba(0, 0, 0, 0.38);
 
 :host {
-  --mdc-outlined-text-field-outline-color: #{$white-low};
-  --mdc-outlined-text-field-hover-outline-color: #{$white-mid};
-  --mdc-outlined-text-field-focus-outline-color: #{$white-full};
-  --mdc-outlined-text-field-input-text-color: #{$white-full};
-  --mdc-outlined-text-field-label-text-color: #{$white-mid};
-  --mdc-outlined-text-field-focus-label-text-color: #{$white-full};
-  --mdc-outlined-text-field-hover-label-text-color: #{$white-mid};
-  --mdc-outlined-text-field-input-text-placeholder-color: #{$white-low};
+  --mdc-outlined-text-field-outline-color: #{$dark-low};
+  --mdc-outlined-text-field-hover-outline-color: #{$dark-mid};
+  --mdc-outlined-text-field-focus-outline-color: #{$dark-full};
+  --mdc-outlined-text-field-input-text-color: #{$dark-full};
+  --mdc-outlined-text-field-label-text-color: #{$dark-mid};
+  --mdc-outlined-text-field-focus-label-text-color: #{$dark-full};
+  --mdc-outlined-text-field-hover-label-text-color: #{$dark-mid};
+  --mdc-outlined-text-field-input-text-placeholder-color: #{$dark-low};
   --mat-form-field-outlined-label-text-populated-size: 11px;
-  --mat-datepicker-toggle-icon-button-color: #{$white-mid};
-  --mat-timepicker-toggle-icon-button-color: #{$white-mid};
-  --mat-icon-button-icon-color: #{$white-mid};
-  --mat-icon-button-state-layer-color: #{$white-full};
+  --mat-datepicker-toggle-icon-button-color: #{$dark-mid};
+  --mat-timepicker-toggle-icon-button-color: #{$dark-mid};
+  --mat-icon-button-icon-color: #{$dark-mid};
+  --mat-icon-button-state-layer-color: #{$dark-full};
 }
 
 .dp-wrapper {
