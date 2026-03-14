@@ -1,6 +1,16 @@
 import { Injectable } from '@angular/core';
 import type * as GeoJSON from 'geojson';
 
+export interface HikeIsochroneProperties {
+  value: number;
+  group_index: number;
+}
+
+export interface HikeIsochroneResult {
+  type: 'FeatureCollection';
+  features: GeoJSON.Feature<GeoJSON.Polygon, HikeIsochroneProperties>[];
+}
+
 export interface ReachabilityStop {
   name: string;
   duration_min: number;
@@ -49,6 +59,13 @@ export class TransportService {
     const resp = await fetch(`/api/reachability/?${params}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     return resp.json() as Promise<ReachabilityResult>;
+  }
+
+  async getHikeIsochrone(lat: number, lon: number): Promise<HikeIsochroneResult> {
+    const params = new URLSearchParams({ lat: String(lat), lon: String(lon) });
+    const resp = await fetch(`/api/hike-isochrone/?${params}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json() as Promise<HikeIsochroneResult>;
   }
 
   async getReachabilityOptimal(

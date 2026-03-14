@@ -63,6 +63,22 @@
   }
 }
 
+/* Hike isochrone popup button – rendered in Leaflet DOM outside Angular */
+:host ::ng-deep .isochrone-trigger-btn {
+  background: #2e7d32;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 5px 12px;
+  font-size: 12px;
+  cursor: pointer;
+  width: 100%;
+
+  &:hover {
+    background: #1b5e20;
+  }
+}
+
 /* Popup save button – rendered in Leaflet DOM outside Angular */
 :host ::ng-deep .popup-save-btn {
   background: #1976d2;

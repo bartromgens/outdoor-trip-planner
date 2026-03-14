@@ -4,6 +4,11 @@
     <span class="map-loading-overlay__text">{{ reachabilityLoadingText }}</span>
   </div>
 }
+@if (isochroneLoading) {
+  <div class="map-loading-overlay">
+    <span class="map-loading-overlay__text">Loading hike isochrones&hellip;</span>
+  </div>
+}
 <div class="map-controls">
   <button
     mat-raised-button

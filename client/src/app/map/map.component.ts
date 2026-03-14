@@ -13,7 +13,11 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatDialog } from '@angular/material/dialog';
 import { ChatService } from '../services/chat.service';
 import { LocationService, savedLocationsToFeatureCollection } from '../services/location.service';
-import { TransportService, type ReachabilityStop } from '../services/transport.service';
+import {
+  TransportService,
+  type HikeIsochroneResult,
+  type ReachabilityStop,
+} from '../services/transport.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
 import type { BoundingBox } from '../services/chat.service';
 import { environment } from '../../environments/environment';
@@ -42,6 +46,40 @@ const BUCKET_COLORS: Record<number, string> = {
   45: '#e65100',
   60: '#b71c1c',
 };
+
+interface IsochroneBucket {
+  seconds: number;
+  label: string;
+  color: string;
+  fillOpacity: number;
+}
+
+// Must match the backend ELEVATION_COMPENSATION_FACTOR in api/views.py.
+const ELEVATION_COMPENSATION_FACTOR = 1.5;
+
+const ISOCHRONE_BUCKETS: IsochroneBucket[] = [
+  {
+    seconds: Math.round((3 * 3600) / ELEVATION_COMPENSATION_FACTOR),
+    label: '3 h',
+    color: '#e65100',
+    fillOpacity: 0.12,
+  },
+  {
+    seconds: Math.round((2 * 3600) / ELEVATION_COMPENSATION_FACTOR),
+    label: '2 h',
+    color: '#f9a825',
+    fillOpacity: 0.18,
+  },
+  {
+    seconds: Math.round((1 * 3600) / ELEVATION_COMPENSATION_FACTOR),
+    label: '1 h',
+    color: '#2e7d32',
+    fillOpacity: 0.25,
+  },
+];
+
+const ISOCHRONE_DISCLAIMER =
+  'Approximate — elevation gain/loss not modelled. Actual hiking time in steep terrain will be longer.';
 
 function colorForCategory(category?: string): string {
   return (category && CATEGORY_COLORS[category]) || DEFAULT_COLOR;
@@ -158,9 +196,11 @@ export class MapComponent implements AfterViewInit, OnDestroy {
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
   private reachabilityLayer?: L.LayerGroup;
+  private isochroneLayer?: L.LayerGroup;
   private subscription?: Subscription;
   addingLocation = false;
   reachabilityLoading = false;
+  isochroneLoading = false;
 
   get reachabilityLoadingText(): string {
     return this.tripDateTime.departureTime()
@@ -266,23 +306,46 @@ export class MapComponent implements AfterViewInit, OnDestroy {
     const popup = L.popup({ closeButton: true, minWidth: 180 })
       .setLatLng(e.latlng)
       .setContent(
-        `<div>
-          <div style="font-weight:600;margin-bottom:4px">Transit reachability</div>
-          ${departureHint}
-          <button class="reachability-trigger-btn" type="button">
-            Show stops within 60 min
-          </button>
+        `<div style="display:flex;flex-direction:column;gap:6px">
+          <div>
+            <div style="font-weight:600;margin-bottom:4px">Transit reachability</div>
+            ${departureHint}
+            <button class="reachability-trigger-btn" type="button">
+              Show stops within 60 min
+            </button>
+          </div>
+          <hr style="margin:2px 0;border:none;border-top:1px solid rgba(0,0,0,.12)">
+          <div>
+            <div style="font-weight:600;margin-bottom:4px">Hike isochrones</div>
+            <button class="isochrone-trigger-btn" type="button">
+              Show 1/2/3 h hiking range
+            </button>
+            <div style="font-size:10px;opacity:.6;margin-top:4px;line-height:1.3">
+              Approximate — elevation not modelled
+            </div>
+          </div>
         </div>`,
       )
       .openOn(this.map);
 
     setTimeout(() => {
-      const btn = popup.getElement()?.querySelector<HTMLButtonElement>('.reachability-trigger-btn');
-      if (!btn) return;
-      btn.addEventListener('click', () => {
-        this.map.closePopup();
-        this.ngZone.run(() => this.loadReachability(lat, lng));
-      });
+      const reachBtn = popup
+        .getElement()
+        ?.querySelector<HTMLButtonElement>('.reachability-trigger-btn');
+      if (reachBtn) {
+        reachBtn.addEventListener('click', () => {
+          this.map.closePopup();
+          this.ngZone.run(() => this.loadReachability(lat, lng));
+        });
+      }
+
+      const isoBtn = popup.getElement()?.querySelector<HTMLButtonElement>('.isochrone-trigger-btn');
+      if (isoBtn) {
+        isoBtn.addEventListener('click', () => {
+          this.map.closePopup();
+          this.ngZone.run(() => this.loadHikeIsochrone(lat, lng));
+        });
+      }
     }, 0);
   }
 
@@ -301,6 +364,54 @@ export class MapComponent implements AfterViewInit, OnDestroy {
       this.reachabilityLoading = false;
       this.cdr.detectChanges();
     }
+  }
+
+  private async loadHikeIsochrone(lat: number, lng: number): Promise<void> {
+    this.isochroneLoading = true;
+    this.cdr.detectChanges();
+    try {
+      const result = await this.transportService.getHikeIsochrone(lat, lng);
+      this.renderIsochroneLayer(result);
+    } catch {
+      console.error('Failed to load hike isochrone data');
+    } finally {
+      this.isochroneLoading = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  private renderIsochroneLayer(result: HikeIsochroneResult): void {
+    if (this.isochroneLayer) {
+      this.layerControl.removeLayer(this.isochroneLayer);
+      this.map.removeLayer(this.isochroneLayer);
+    }
+
+    // ORS returns features ordered smallest → largest range (1h, 2h, 3h).
+    // Render largest first so smaller polygons paint on top.
+    const sorted = [...result.features].sort((a, b) => b.properties.value - a.properties.value);
+
+    const layers = sorted.map((feature) => {
+      const cfg =
+        ISOCHRONE_BUCKETS.find((b) => b.seconds === feature.properties.value) ??
+        ISOCHRONE_BUCKETS[0];
+      const layer = L.geoJSON(feature as GeoJSON.Feature, {
+        style: {
+          color: cfg.color,
+          weight: 2,
+          opacity: 0.8,
+          fillColor: cfg.color,
+          fillOpacity: cfg.fillOpacity,
+        },
+      });
+      layer.bindPopup(
+        `<b>Hiking range: ${cfg.label}</b>` +
+          `<div style="font-size:11px;opacity:.65;margin-top:4px;max-width:180px;line-height:1.3">${ISOCHRONE_DISCLAIMER}</div>`,
+      );
+      return layer;
+    });
+
+    this.isochroneLayer = L.layerGroup(layers).addTo(this.map);
+    this.layerControl.addOverlay(this.isochroneLayer, 'Hike isochrones');
   }
 
   private renderReachabilityLayer(

@@ -12,6 +12,8 @@ from rest_framework.decorators import api_view
 from rest_framework.request import Request
 from rest_framework.response import Response
 
+from django.conf import settings
+
 from .models import Location
 from .serializers import LocationSerializer
 from .services.agent import run_agent, stream_agent_events
@@ -258,6 +260,60 @@ def reachability(request: Request) -> Response:
             "features": features,
         }
     )
+
+
+ORS_BASE = "https://api.openrouteservice.org/v2"
+# ORS foot-hiking uses a flat 5 km/h regardless of slope (elevation not modelled).
+# Dividing the ORS time ranges by this factor compensates for the speed overestimation
+# in mountain terrain, so the displayed labels (1h/2h/3h) reflect realistic hiking time.
+ELEVATION_COMPENSATION_FACTOR = 1.5
+ISOCHRONE_RANGES = [int(h * 3600 / ELEVATION_COMPENSATION_FACTOR) for h in [1, 2, 3]]
+
+
+@api_view(["GET"])
+def hike_isochrone(request: Request) -> Response:
+    lat_str = request.query_params.get("lat", "")
+    lon_str = request.query_params.get("lon", "")
+
+    if not lat_str or not lon_str:
+        return Response(
+            {"error": "lat and lon are required"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        lat = float(lat_str)
+        lon = float(lon_str)
+    except ValueError:
+        return Response(
+            {"error": "lat and lon must be numeric"}, status=status.HTTP_400_BAD_REQUEST
+        )
+
+    api_key = getattr(settings, "ORS_API_KEY", "")
+    if not api_key:
+        return Response(
+            {"error": "OpenRouteService API key not configured"},
+            status=status.HTTP_503_SERVICE_UNAVAILABLE,
+        )
+
+    try:
+        resp = httpx.post(
+            f"{ORS_BASE}/isochrones/foot-hiking",
+            headers={"Authorization": api_key, "Content-Type": "application/json"},
+            json={
+                "locations": [[lon, lat]],
+                "range": ISOCHRONE_RANGES,
+                "range_type": "time",
+            },
+            timeout=TIMEOUT,
+        )
+        resp.raise_for_status()
+    except Exception:
+        logger.exception("ORS isochrone API error")
+        return Response(
+            {"error": "Failed to fetch isochrone data"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    return Response(resp.json())
 
 
 @csrf_exempt
