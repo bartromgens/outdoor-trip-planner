@@ -45,8 +45,8 @@ const ISOCHRONE_BUCKETS: IsochroneBucket[] = [
   {
     seconds: Math.round((3 * 3600) / ELEVATION_COMPENSATION_FACTOR),
     label: '3 h',
-    color: '#0d47a1',
-    fillOpacity: 0.03,
+    color: '#64b5f6',
+    fillOpacity: 0.10,
   },
   {
     seconds: Math.round((2 * 3600) / ELEVATION_COMPENSATION_FACTOR),
@@ -57,8 +57,8 @@ const ISOCHRONE_BUCKETS: IsochroneBucket[] = [
   {
     seconds: Math.round((1 * 3600) / ELEVATION_COMPENSATION_FACTOR),
     label: '1 h',
-    color: '#64b5f6',
-    fillOpacity: 0.20,
+    color: '#0d47a1',
+    fillOpacity: 0.10,
   },
 ];
 
