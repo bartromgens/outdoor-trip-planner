@@ -9,7 +9,15 @@
   [mapUuid]="currentMapUuid"
   (hikingRangesCleared)="onHikingRangesCleared()"
 ></app-map-reachability>
-<app-hike-planning #hikePlanning [mapUuid]="currentMapUuid"></app-hike-planning>
+<app-hike-planning
+  #hikePlanning
+  [mapUuid]="currentMapUuid"
+  (elevationProfile)="activeElevationProfile.set($event)"
+></app-hike-planning>
+<app-elevation-profile
+  [profileData]="activeElevationProfile()"
+  (closed)="activeElevationProfile.set(null)"
+></app-elevation-profile>
 <app-map-saved-locations
   #savedLocations
   [mapUuid]="currentMapUuid"

@@ -1,0 +1,9 @@
+<div class="elevation-panel" [class.elevation-panel--visible]="isVisible">
+  <div class="elevation-header">
+    <span class="elevation-title">Elevation profile</span>
+    <button class="elevation-close-btn" type="button" (click)="onClose()">&#x2715;</button>
+  </div>
+  <div class="chart-container">
+    <canvas #chartCanvas></canvas>
+  </div>
+</div>

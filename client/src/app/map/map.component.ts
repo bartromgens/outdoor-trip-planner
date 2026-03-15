@@ -6,6 +6,7 @@ import {
   ViewChild,
   inject,
   effect,
+  signal,
   ChangeDetectorRef,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -32,6 +33,7 @@ import { MapControlsComponent } from './map-controls.component';
 import { HikePlanningComponent } from './hike-planning.component';
 import { MapReachabilityComponent } from './map-reachability.component';
 import { MapSavedLocationsComponent } from './map-saved-locations.component';
+import { ElevationProfileComponent } from './elevation-profile.component';
 import { circleMarkerIcon } from './map-marker-icons';
 
 interface ContourConfig {
@@ -63,6 +65,7 @@ const CONTOUR_CONFIGS: ContourConfig[] = [
     HikePlanningComponent,
     MapReachabilityComponent,
     MapSavedLocationsComponent,
+    ElevationProfileComponent,
   ],
 })
 export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -96,6 +99,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
 
   currentMapUuid = '';
   addingLocation = false;
+  activeElevationProfile = signal<[number, number][] | null>(null);
 
   constructor() {
     effect(() => {

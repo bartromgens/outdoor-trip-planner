@@ -1,4 +1,4 @@
-import { Component, inject, input, NgZone, ChangeDetectorRef, OnDestroy } from '@angular/core';
+import { Component, inject, input, output, NgZone, ChangeDetectorRef, OnDestroy } from '@angular/core';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import { MatDialog } from '@angular/material/dialog';
@@ -32,6 +32,14 @@ function formatRouteDuration(seconds: number): string {
   return h > 0 ? `${h} h ${m} min` : `${m} min`;
 }
 
+function formatElevationStats(
+  ascentM: number | null | undefined,
+  descentM: number | null | undefined,
+): string {
+  if (ascentM == null || descentM == null) return '';
+  return `<br><span style="font-size:12px">&#8593; ${ascentM} m &nbsp; &#8595; ${descentM} m</span>`;
+}
+
 @Component({
   selector: 'app-hike-planning',
   templateUrl: './hike-planning.component.html',
@@ -45,6 +53,7 @@ export class HikePlanningComponent implements OnDestroy {
   private cdr = inject(ChangeDetectorRef);
 
   mapUuid = input.required<string>();
+  readonly elevationProfile = output<[number, number][] | null>();
 
   private map!: L.Map;
   private layerControl!: L.Control.Layers;
@@ -93,6 +102,7 @@ export class HikePlanningComponent implements OnDestroy {
     this.hikeLoading = false;
     this.editingRouteId = null;
     this.lastHikeDirectionsResult = null;
+    this.elevationProfile.emit(null);
   }
 
   saveHikeRoute(): void {
@@ -177,11 +187,13 @@ export class HikePlanningComponent implements OnDestroy {
 
         const distKm = route.distance_m != null ? (route.distance_m / 1000).toFixed(1) : '?';
         const dur = route.duration_s != null ? formatRouteDuration(route.duration_s) : '?';
+        const statsRow = formatElevationStats(route.ascent_m, route.descent_m);
         const popupId = `hike-popup-${route.id}`;
         layer.bindPopup(
           `<div id="${popupId}">
             <b>${route.name}</b><br>
             <span style="font-size:12px">${distKm} km &mdash; ${dur}</span>
+            ${statsRow}
             <div class="hike-popup-actions">
               <button class="hike-edit-btn" data-id="${route.id}" type="button">Edit</button>
               <button class="hike-delete-btn" data-id="${route.id}" type="button">Delete</button>
@@ -190,6 +202,7 @@ export class HikePlanningComponent implements OnDestroy {
         );
 
         layer.on('popupopen', () => {
+          this.ngZone.run(() => this.elevationProfile.emit(route.elevation_profile ?? null));
           setTimeout(() => {
             const el = this.map.getContainer();
             const editBtn = el.querySelector<HTMLButtonElement>(`#${popupId} .hike-edit-btn`);
@@ -203,6 +216,10 @@ export class HikePlanningComponent implements OnDestroy {
               this.ngZone.run(() => this.deleteHikeRoute(route.id));
             });
           }, 0);
+        });
+
+        layer.on('popupclose', () => {
+          this.ngZone.run(() => this.elevationProfile.emit(null));
         });
 
         return layer;
@@ -325,9 +342,11 @@ export class HikePlanningComponent implements OnDestroy {
         if (!summary) return;
         const distKm = (summary['distance'] / 1000).toFixed(1);
         const dur = formatRouteDuration(summary['duration']);
+        const statsRow = formatElevationStats(summary['ascent_m'], summary['descent_m']);
         layer.bindPopup(
           `<b>Hike route</b><br>
-          <span style="font-size:12px">${distKm} km &mdash; ${dur}</span>`,
+          <span style="font-size:12px">${distKm} km &mdash; ${dur}</span>
+          ${statsRow}`,
         );
       },
     }).addTo(this.map);
@@ -335,6 +354,8 @@ export class HikePlanningComponent implements OnDestroy {
       m.remove();
       m.addTo(this.map);
     }
+    const profile = result.features[0]?.properties?.summary?.elevation_profile;
+    this.elevationProfile.emit(profile ?? null);
   }
 
   private async persistHikeRoute(name: string, isUpdate: boolean): Promise<void> {
@@ -349,6 +370,9 @@ export class HikePlanningComponent implements OnDestroy {
       geometry: feature.geometry.coordinates as [number, number][],
       distance_m: summary?.['distance'] ?? null,
       duration_s: summary?.['duration'] ?? null,
+      ascent_m: summary?.['ascent_m'] ?? null,
+      descent_m: summary?.['descent_m'] ?? null,
+      elevation_profile: summary?.['elevation_profile'] ?? null,
     };
 
     const uuid = this.mapUuid();

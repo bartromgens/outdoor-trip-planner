@@ -9,6 +9,9 @@ export interface SavedHikeRoute {
   geometry: [number, number][];
   distance_m: number | null;
   duration_s: number | null;
+  ascent_m: number | null;
+  descent_m: number | null;
+  elevation_profile: [number, number][] | null;
   created_at: string;
   updated_at: string;
 }
@@ -19,6 +22,9 @@ interface HikeRoutePayload {
   geometry: [number, number][];
   distance_m: number | null;
   duration_s: number | null;
+  ascent_m: number | null;
+  descent_m: number | null;
+  elevation_profile: [number, number][] | null;
 }
 
 @Injectable({ providedIn: 'root' })

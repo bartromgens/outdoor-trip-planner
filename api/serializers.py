@@ -22,6 +22,9 @@ class HikeRouteSerializer(serializers.ModelSerializer):
             "geometry",
             "distance_m",
             "duration_s",
+            "ascent_m",
+            "descent_m",
+            "elevation_profile",
             "created_at",
             "updated_at",
         ]

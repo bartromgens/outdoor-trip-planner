@@ -26,10 +26,15 @@ class HikeRoute(models.Model):
     name = models.CharField(max_length=255)
     waypoints = models.JSONField(help_text="[[lon, lat], ...] user control points")
     geometry = models.JSONField(
-        help_text="[[lon, lat], ...] ORS LineString coordinates"
+        help_text="[[lon, lat], ...] LineString coordinates"
     )
     distance_m = models.FloatField(null=True, blank=True)
     duration_s = models.FloatField(null=True, blank=True)
+    ascent_m = models.FloatField(null=True, blank=True)
+    descent_m = models.FloatField(null=True, blank=True)
+    elevation_profile = models.JSONField(
+        null=True, blank=True, help_text="[[dist_m, elev_m], ...] elevation profile"
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

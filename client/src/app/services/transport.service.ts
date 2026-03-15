@@ -14,6 +14,9 @@ export interface HikeIsochroneResult {
 export interface HikeDirectionsSummary {
   distance: number;
   duration: number;
+  ascent_m?: number;
+  descent_m?: number;
+  elevation_profile?: [number, number][];
 }
 
 export interface HikeDirectionsProperties {

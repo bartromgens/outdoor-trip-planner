@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import Any
 
 import httpx
@@ -33,6 +34,65 @@ VALHALLA_PEDESTRIAN_OPTIONS = {
     "use_tracks": 1.0,
     "use_hills": 1.0,
 }
+
+
+def _haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Return distance in metres between two (lat, lon) points."""
+    R = 6_371_000.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlambda = math.radians(lon2 - lon1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlambda / 2) ** 2
+    return R * 2 * math.asin(math.sqrt(min(1.0, a)))
+
+
+def _ascent_descent(elevations: list[float]) -> tuple[int, int]:
+    ascent = descent = 0.0
+    for i in range(1, len(elevations)):
+        diff = elevations[i] - elevations[i - 1]
+        if diff > 0:
+            ascent += diff
+        else:
+            descent += abs(diff)
+    return round(ascent), round(descent)
+
+
+def _elevation_profile_from_3d_coords(
+    coords_3d: list[list[float]],
+) -> list[list[float]]:
+    """Build [[dist_m, elev_m], ...] from [lon, lat, elev] triples."""
+    profile: list[list[float]] = []
+    dist_m = 0.0
+    prev: list[float] | None = None
+    for coord in coords_3d:
+        if len(coord) < 3:
+            continue
+        if prev is not None:
+            dist_m += _haversine_m(prev[1], prev[0], coord[1], coord[0])
+        profile.append([round(dist_m), round(coord[2])])
+        prev = coord
+    return profile
+
+
+def _enrich_ors_directions(data: dict[str, Any]) -> dict[str, Any]:
+    """Add elevation_profile, ascent_m, descent_m to ORS response; strip to 2D geometry."""
+    for feature in data.get("features", []):
+        coords: list[list[float]] = feature.get("geometry", {}).get("coordinates", [])
+        if not coords or len(coords[0]) < 3:
+            continue
+        profile = _elevation_profile_from_3d_coords(coords)
+        elevations = [p[1] for p in profile]
+        ascent, descent = _ascent_descent(elevations)
+
+        summary: dict[str, Any] = (
+            feature.setdefault("properties", {}).setdefault("summary", {})
+        )
+        summary["ascent_m"] = ascent
+        summary["descent_m"] = descent
+        summary["elevation_profile"] = profile
+
+        feature["geometry"]["coordinates"] = [[c[0], c[1]] for c in coords]
+    return data
 
 
 def _decode_polyline6(encoded: str) -> list[tuple[float, float]]:
@@ -157,11 +217,11 @@ def directions_ors(coordinates: list[list[float]], api_key: str) -> dict[str, An
     resp = httpx.post(
         f"{ORS_BASE}/directions/foot-hiking/geojson",
         headers={"Authorization": api_key, "Content-Type": "application/json"},
-        json={"coordinates": coordinates},
+        json={"coordinates": coordinates, "elevation": True},
         timeout=TIMEOUT,
     )
     resp.raise_for_status()
-    return resp.json()
+    return _enrich_ors_directions(resp.json())
 
 
 def directions_valhalla(coordinates: list[list[float]], api_key: str) -> dict[str, Any]:
@@ -178,6 +238,7 @@ def directions_valhalla(coordinates: list[list[float]], api_key: str) -> dict[st
             "costing": "pedestrian",
             "costing_options": {"pedestrian": VALHALLA_PEDESTRIAN_OPTIONS},
             "units": "km",
+            "elevation_interval": 30,
         },
         timeout=TIMEOUT,
     )
@@ -198,10 +259,13 @@ def _normalize_valhalla_directions(data: dict[str, Any]) -> dict[str, Any]:
     legs = trip.get("legs", [])
 
     all_coords: list[list[float]] = []
+    all_elevations: list[float] = []
+    elevation_interval_m: float = 30.0
     total_distance_m = 0.0
     total_duration_s = 0.0
+    cumulative_dist_m = 0.0
 
-    for leg in legs:
+    for i, leg in enumerate(legs):
         shape = leg.get("shape", "")
         decoded = _decode_polyline6(shape)
         leg_coords = [[lon, lat] for lat, lon in decoded]
@@ -210,18 +274,45 @@ def _normalize_valhalla_directions(data: dict[str, Any]) -> dict[str, Any]:
         all_coords.extend(leg_coords)
 
         summary = leg.get("summary", {})
-        total_distance_m += summary.get("length", 0.0) * 1000
+        leg_dist_m = summary.get("length", 0.0) * 1000
+        total_distance_m += leg_dist_m
         total_duration_s += summary.get("time", 0.0)
 
+        leg_elev: list[float] = leg.get("elevation", [])
+        interval_m: float = float(leg.get("elevation_interval", 30))
+        if i == 0:
+            elevation_interval_m = interval_m
+        if leg_elev:
+            skip = 1 if all_elevations else 0
+            all_elevations.extend(leg_elev[skip:])
+
+        cumulative_dist_m += leg_dist_m
+
+    elevation_profile: list[list[float]] = []
+    ascent_m: int | None = None
+    descent_m: int | None = None
+    if all_elevations:
+        elevation_profile = [
+            [round(j * elevation_interval_m), round(e)]
+            for j, e in enumerate(all_elevations)
+        ]
+        ascent_m, descent_m = _ascent_descent(all_elevations)
+
     n = len(all_coords)
+    summary_props: dict[str, Any] = {
+        "distance": total_distance_m,
+        "duration": total_duration_s,
+    }
+    if ascent_m is not None:
+        summary_props["ascent_m"] = ascent_m
+        summary_props["descent_m"] = descent_m
+        summary_props["elevation_profile"] = elevation_profile
+
     feature: dict[str, Any] = {
         "type": "Feature",
         "geometry": {"type": "LineString", "coordinates": all_coords},
         "properties": {
-            "summary": {
-                "distance": total_distance_m,
-                "duration": total_duration_s,
-            },
+            "summary": summary_props,
             "way_points": [0, n - 1] if n > 0 else [0, 0],
         },
     }
