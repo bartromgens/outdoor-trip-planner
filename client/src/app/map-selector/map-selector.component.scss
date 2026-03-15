@@ -8,10 +8,20 @@
   display: flex;
   align-items: center;
   gap: 0;
+
+  :host-context(mat-sidenav) & {
+    width: 100%;
+  }
 }
 
 .map-selector__field {
   width: 200px;
+
+  :host-context(mat-sidenav) & {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
   font-size: 14px;
 
   :host-context(.toolbar-white) & {
@@ -41,6 +51,10 @@
   }
 }
 
-.map-selector__actions {
-  margin-left: -8px;
+.map-selector button[mat-icon-button] {
+  margin-left: -4px;
+
+  &:first-of-type {
+    margin-left: 4px;
+  }
 }

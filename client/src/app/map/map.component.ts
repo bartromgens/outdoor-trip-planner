@@ -12,6 +12,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import { Subscription } from 'rxjs';
+import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { ChatService } from '../services/chat.service';
@@ -42,6 +43,7 @@ interface ContourConfig {
 }
 
 const DEFAULT_CONTOUR_LEVEL = 2000;
+const MOBILE_BREAKPOINT = '(max-width: 768px)';
 
 const CONTOUR_CONFIGS: ContourConfig[] = [
   { level: 1500, label: 'Contour 1500 m', color: '#a0522d', weight: 1.5, dashArray: '6 4' },
@@ -75,6 +77,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private tileLayerService = inject(MapTileLayerService);
   private locationSearch = inject(LocationSearchService);
   private locationService = inject(LocationService);
+  private breakpointObserver = inject(BreakpointObserver);
 
   @ViewChild('hikePlanning') private hikePlanningComp!: HikePlanningComponent;
   @ViewChild('reachability') private reachabilityComp!: MapReachabilityComponent;
@@ -134,8 +137,12 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.urlOverlays = urlParams.overlays ?? null;
 
+    const isMobile = this.breakpointObserver.isMatched(MOBILE_BREAKPOINT);
     this.layerControl = L.control
-      .layers(baseLayerConfig, undefined, { collapsed: false })
+      .layers(baseLayerConfig, undefined, {
+        collapsed: isMobile,
+        position: isMobile ? 'bottomright' : 'topright',
+      })
       .addTo(this.map);
 
     L.control.scale({ imperial: false }).addTo(this.map);

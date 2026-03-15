@@ -14,25 +14,26 @@
 
   <button
     mat-icon-button
-    [matMenuTriggerFor]="mapsMenu"
-    class="map-selector__actions"
     type="button"
+    matTooltip="New map"
+    (click)="openNewMapDialog()"
   >
-    <mat-icon>more_vert</mat-icon>
+    <mat-icon>add</mat-icon>
   </button>
-
-  <mat-menu #mapsMenu="matMenu" class="maps-actions-menu">
-    <button mat-menu-item (click)="openNewMapDialog()">
-      <mat-icon>add</mat-icon>
-      <span>New map</span>
-    </button>
-    <button mat-menu-item (click)="openRenameDialog()">
-      <mat-icon>edit</mat-icon>
-      <span>Rename map</span>
-    </button>
-    <button mat-menu-item (click)="copyShareLink()">
-      <mat-icon>link</mat-icon>
-      <span>Copy share link</span>
-    </button>
-  </mat-menu>
+  <button
+    mat-icon-button
+    type="button"
+    matTooltip="Rename map"
+    (click)="openRenameDialog()"
+  >
+    <mat-icon>edit</mat-icon>
+  </button>
+  <button
+    mat-icon-button
+    type="button"
+    matTooltip="Copy share link"
+    (click)="copyShareLink()"
+  >
+    <mat-icon>link</mat-icon>
+  </button>
 </div>

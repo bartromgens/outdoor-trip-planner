@@ -12,6 +12,27 @@
     padding: 0;
     align-items: center;
   }
+
+  @media (max-width: 768px) {
+    position: relative;
+
+    .location-search-wrapper {
+      position: absolute;
+      top: 100%;
+      left: 16px;
+      right: 16px;
+      z-index: 1000;
+      margin-top: 8px;
+      padding: 4px 0 0;
+      background: #fff;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      border-radius: 8px;
+
+      &.sidebar-open {
+        z-index: 2;
+      }
+    }
+  }
 }
 
 .sidenav-container {
@@ -20,6 +41,29 @@
 
 mat-sidenav {
   width: max(20%, 250px);
+  background-color: #fff;
+
+  @media (max-width: 768px) {
+    width: 90%;
+  }
+
+  ::ng-deep .mat-drawer-inner-container {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  app-map-selector {
+    flex-shrink: 0;
+    padding: 16px;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  app-chat {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
 }
 
 mat-sidenav-content {

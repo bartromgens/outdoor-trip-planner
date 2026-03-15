@@ -1,13 +1,25 @@
 <mat-toolbar class="toolbar-white">
   <span>{{ title() }}</span>
   <span class="toolbar-spacer"></span>
-  <app-map-selector />
-  <app-location-search />
-  <app-departure-datetime-picker />
+  <div
+    class="location-search-wrapper"
+    [class.sidebar-open]="isMobile() && sidenavOpened()"
+  >
+    <app-location-search />
+  </div>
+  @if (!isMobile()) {
+    <app-departure-datetime-picker />
+  }
 </mat-toolbar>
 
 <mat-sidenav-container class="sidenav-container">
-  <mat-sidenav #sidenav mode="side" opened>
+  <mat-sidenav
+    #sidenav
+    [mode]="sidenavMode()"
+    [opened]="sidenavOpened()"
+    (openedChange)="sidenavOpened.set($event)"
+  >
+    <app-map-selector />
     <app-chat />
   </mat-sidenav>
 
@@ -16,9 +28,9 @@
       class="sidebar-toggle"
       type="button"
       (click)="toggleSidebar()"
-      [attr.aria-label]="sidenav.opened ? 'Close sidebar' : 'Open sidebar'"
+      [attr.aria-label]="sidenavOpened() ? 'Close sidebar' : 'Open sidebar'"
     >
-      <mat-icon>{{ sidenav.opened ? 'chevron_left' : 'chevron_right' }}</mat-icon>
+      <mat-icon>{{ sidenavOpened() ? 'chevron_left' : 'chevron_right' }}</mat-icon>
     </button>
     <router-outlet />
   </mat-sidenav-content>

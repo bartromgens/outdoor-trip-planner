@@ -15,6 +15,12 @@
   cursor: crosshair;
 }
 
+@media (max-width: 768px) {
+  :host ::ng-deep .leaflet-control-zoom {
+    display: none;
+  }
+}
+
 // Base mixin for all Leaflet popup action buttons rendered outside Angular
 @mixin popup-btn-base($padding: 4px 10px) {
   color: #fff;

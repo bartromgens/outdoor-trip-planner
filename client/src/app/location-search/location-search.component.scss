@@ -2,6 +2,11 @@
   &__field {
     width: 280px;
     margin-right: 8px;
+
+    @media (max-width: 768px) {
+      width: 100%;
+      margin-right: 0;
+    }
   }
 
   &__option-label {
