@@ -24,6 +24,9 @@ ssh "$HOST" bash <<EOF
   echo "Building and restarting containers..."
   docker compose -f docker-compose.prod.yml up --build -d
 
+  echo "Running migrations..."
+  docker compose -f docker-compose.prod.yml exec -T api python manage.py migrate --no-input
+
   echo "Removing unused images..."
   docker image prune -f
 
