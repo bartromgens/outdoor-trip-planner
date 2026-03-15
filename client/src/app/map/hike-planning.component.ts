@@ -104,6 +104,7 @@ export class HikePlanningComponent implements OnDestroy {
 
   hikeLoading = false;
   editingRouteId: number | null = null;
+  editingRouteName: string | null = null;
   readonly routeStats = signal<HikeRouteStats | null>(null);
 
   constructor() {
@@ -142,6 +143,7 @@ export class HikePlanningComponent implements OnDestroy {
     }
     this.hikeLoading = false;
     this.editingRouteId = null;
+    this.editingRouteName = null;
     this.lastHikeDirectionsResult = null;
     this.routeStats.set(null);
     this.elevationProfile.emit(null);
@@ -164,7 +166,7 @@ export class HikePlanningComponent implements OnDestroy {
     if (!this.editingRouteId) return;
     this.ngZone.run(() => {
       const ref = this.dialog.open(SaveHikeDialogComponent, {
-        data: {},
+        data: { existingName: this.editingRouteName ?? undefined },
         width: '360px',
       });
       ref.afterClosed().subscribe(async (result: SaveHikeDialogResult | undefined) => {
@@ -191,6 +193,7 @@ export class HikePlanningComponent implements OnDestroy {
     this.hikePlanningActiveChange.emit(true);
     this.clearHikeRoute();
     this.editingRouteId = route.id;
+    this.editingRouteName = route.name;
     for (const [lon, lat] of route.waypoints) {
       const latlng = L.latLng(lat, lon);
       this.hikeWaypoints.push(latlng);
