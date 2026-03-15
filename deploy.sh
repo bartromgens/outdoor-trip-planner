@@ -3,8 +3,16 @@ set -euo pipefail
 
 HOST="plan.hikingmap.org"
 REMOTE_DIR="~/outdoor-trip-planner"
+BRANCH="master"
 
 echo "Deploying to $HOST..."
+
+echo "Checking that local $BRANCH is pushed to origin..."
+git fetch origin
+if [[ -n "$(git rev-list "origin/$BRANCH..$BRANCH" 2>/dev/null)" ]]; then
+  echo "Error: Local $BRANCH has commits not pushed to origin. Push first, then deploy."
+  exit 1
+fi
 
 ssh "$HOST" bash <<EOF
   set -euo pipefail
