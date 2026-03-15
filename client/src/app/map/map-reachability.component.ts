@@ -45,20 +45,20 @@ const ISOCHRONE_BUCKETS: IsochroneBucket[] = [
   {
     seconds: Math.round((3 * 3600) / ELEVATION_COMPENSATION_FACTOR),
     label: '3 h',
-    color: '#e65100',
-    fillOpacity: 0.07,
+    color: '#0d47a1',
+    fillOpacity: 0.03,
   },
   {
     seconds: Math.round((2 * 3600) / ELEVATION_COMPENSATION_FACTOR),
     label: '2 h',
-    color: '#f9a825',
-    fillOpacity: 0.11,
+    color: '#1976d2',
+    fillOpacity: 0.10,
   },
   {
     seconds: Math.round((1 * 3600) / ELEVATION_COMPENSATION_FACTOR),
     label: '1 h',
-    color: '#2e7d32',
-    fillOpacity: 0.16,
+    color: '#64b5f6',
+    fillOpacity: 0.20,
   },
 ];
 
@@ -354,7 +354,7 @@ export class MapReachabilityComponent {
       const layer = L.geoJSON(feature as GeoJSON.Feature, {
         style: {
           color: cfg.color,
-          weight: 2,
+          weight: 3,
           opacity: 0.8,
           fillColor: cfg.color,
           fillOpacity: cfg.fillOpacity,
