@@ -176,6 +176,7 @@ export class MapReachabilityComponent {
 
   private map!: L.Map;
   private layerControl!: L.Control.Layers;
+  private getActiveOverlayNames!: () => ReadonlySet<string>;
   private reachabilityLayer?: L.LayerGroup;
   private isochroneLayer?: L.LayerGroup;
   private currentReachabilityFeatures: GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>[] = [];
@@ -202,9 +203,14 @@ export class MapReachabilityComponent {
       : 'Loading reachability\u2026';
   }
 
-  init(map: L.Map, layerControl: L.Control.Layers): void {
+  init(
+    map: L.Map,
+    layerControl: L.Control.Layers,
+    getActiveOverlayNames: () => ReadonlySet<string>,
+  ): void {
     this.map = map;
     this.layerControl = layerControl;
+    this.getActiveOverlayNames = getActiveOverlayNames;
     this.transportService.getConfig().then((c) => {
       this.routingBackend = c.routingBackend;
       this.cdr.detectChanges();
@@ -225,14 +231,20 @@ export class MapReachabilityComponent {
     this.rangeLoading = true;
     this.rangeError.set(false);
     this.cdr.detectChanges();
+    const addIsoToMap =
+      !this.isochroneLayer ||
+      this.getActiveOverlayNames().has('Hike isochrones');
+    const addReachToMap =
+      !this.reachabilityLayer ||
+      this.getActiveOverlayNames().has('Transit reachability');
     const time = this.tripDateTime.departureTime()?.toISOString();
     try {
       const [isochroneResult, reachabilityResult] = await Promise.all([
         this.transportService.getLocationHikeIsochrone(mapUuid, locationId),
         this.transportService.getLocationReachability(mapUuid, locationId, time),
       ]);
-      this.renderIsochroneLayer(isochroneResult);
-      this.renderReachabilityLayer(reachabilityResult.features);
+      this.renderIsochroneLayer(isochroneResult, addIsoToMap);
+      this.renderReachabilityLayer(reachabilityResult.features, addReachToMap);
     } catch (e) {
       console.error('Failed to load saved location range data', e);
       this.rangeError.set(true);
@@ -251,7 +263,7 @@ export class MapReachabilityComponent {
       const result = departureTime
         ? await this.transportService.getReachabilityOptimal(lat, lng, departureTime)
         : await this.transportService.getReachability(lat, lng);
-      this.renderReachabilityLayer(result.features);
+      this.renderReachabilityLayer(result.features, true);
     } catch {
       console.error('Failed to load reachability data');
     } finally {
@@ -273,7 +285,7 @@ export class MapReachabilityComponent {
       const result = useCachedLoc
         ? await this.transportService.getLocationHikeIsochrone(mapUuid, cachedLoc.id)
         : await this.transportService.getHikeIsochrone(lat, lng);
-      this.renderIsochroneLayer(result);
+      this.renderIsochroneLayer(result, true);
     } catch {
       console.error('Failed to load hike isochrone data');
     } finally {
@@ -288,7 +300,10 @@ export class MapReachabilityComponent {
     setTimeout(() => this.cdr.detectChanges(), 0);
   }
 
-  private renderIsochroneLayer(result: HikeIsochroneResult): void {
+  private renderIsochroneLayer(
+    result: HikeIsochroneResult,
+    addToMap: boolean,
+  ): void {
     if (this.isochroneLayer) {
       this.layerControl.removeLayer(this.isochroneLayer);
       this.map.removeLayer(this.isochroneLayer);
@@ -317,13 +332,17 @@ export class MapReachabilityComponent {
       return layer;
     });
 
-    this.isochroneLayer = L.layerGroup(layers).addTo(this.map);
+    this.isochroneLayer = L.layerGroup(layers);
     this.layerControl.addOverlay(this.isochroneLayer, 'Hike isochrones');
+    if (addToMap) {
+      this.isochroneLayer.addTo(this.map);
+    }
     this.hasHikingRanges.set(true);
   }
 
   private renderReachabilityLayer(
     features: GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>[],
+    addToMap: boolean,
   ): void {
     this.currentReachabilityFeatures = features;
     if (this.reachabilityLayer) {
@@ -365,7 +384,10 @@ export class MapReachabilityComponent {
       return marker;
     });
 
-    this.reachabilityLayer = L.layerGroup(markers).addTo(this.map);
+    this.reachabilityLayer = L.layerGroup(markers);
     this.layerControl.addOverlay(this.reachabilityLayer, 'Transit reachability');
+    if (addToMap) {
+      this.reachabilityLayer.addTo(this.map);
+    }
   }
 }

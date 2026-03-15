@@ -184,7 +184,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     });
 
     this.hikePlanningComp.init(this.map, this.layerControl);
-    this.reachabilityComp.init(this.map, this.layerControl);
+    this.reachabilityComp.init(this.map, this.layerControl, () => this.activeOverlayNames);
     this.savedLocationsComp.init(this.map);
 
     this.loadContourLayers();
