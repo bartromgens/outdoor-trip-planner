@@ -11,6 +11,7 @@ export interface SavedLocation {
   altitude: number | null;
   wikidata_id: string;
   description: string;
+  link: string;
   category: string;
   geometry_type: string;
   coordinates: unknown;
@@ -41,6 +42,7 @@ function savedLocationToFeature(loc: SavedLocation): GeoJSON.Feature | null {
       id: loc.id,
       label: loc.name,
       description: loc.description,
+      link: loc.link || '',
       category: loc.category,
       altitude: loc.altitude,
       wikidata_id: loc.wikidata_id || null,
@@ -65,6 +67,7 @@ interface LocationPayload {
   altitude: number | null;
   wikidata_id: string;
   description: string;
+  link: string;
   category: string;
   geometry_type: string;
   coordinates: unknown;
@@ -117,6 +120,7 @@ export class LocationService {
     name: string,
     category: string,
     description: string,
+    link?: string,
   ): Promise<SavedLocation> {
     const payload: LocationPayload = {
       name,
@@ -125,6 +129,7 @@ export class LocationService {
       altitude: null,
       wikidata_id: '',
       description,
+      link: link ?? '',
       category,
       geometry_type: 'point',
       coordinates: [lng, lat],
@@ -148,6 +153,7 @@ export class LocationService {
       altitude: props['altitude'] ?? null,
       wikidata_id: props['wikidata_id'] || '',
       description: props['description'] || '',
+      link: props['link'] || '',
       category: props['category'] || '',
       geometry_type: geoJsonTypeToModel(feature.geometry?.type ?? ''),
       coordinates: extracted.coordinates,
@@ -181,7 +187,7 @@ export class LocationService {
   async updateDetails(
     mapUuid: string,
     locationId: number,
-    details: { name: string; category: string; description?: string },
+    details: { name: string; category: string; description?: string; link?: string },
   ): Promise<SavedLocation> {
     const body: Record<string, string> = {
       name: details.name,
@@ -189,6 +195,9 @@ export class LocationService {
     };
     if (details.description !== undefined) {
       body['description'] = details.description;
+    }
+    if (details.link !== undefined) {
+      body['link'] = details.link;
     }
     return firstValueFrom(
       this.http.put<SavedLocation>(

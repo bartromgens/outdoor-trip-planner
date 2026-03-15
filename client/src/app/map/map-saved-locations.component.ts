@@ -59,19 +59,38 @@ function geoJsonLayerStyle(feature?: GeoJSON.Feature): L.PathOptions {
   return { color: colorForCategory(cat), weight: 3, opacity: 0.8 };
 }
 
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+function escapeHref(url: string): string {
+  return escapeHtml(url)
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 function buildSavedLocationPopupHtml(
   label: string,
   cat: string,
   desc: string,
+  link: string | undefined,
   altitude: number | null | undefined,
   locationId: number | undefined,
 ): string {
-  const parts = [`<b>${label}</b>`];
+  const parts = [`<b>${escapeHtml(label)}</b>`];
   if (altitude != null) {
     parts.push(`<span style="font-size:12px">Altitude: ${altitude} m</span>`);
   }
-  if (cat) parts.push(`<span style="opacity:.6;font-size:12px">${cat}</span>`);
-  if (desc) parts.push(`<div style="margin-top:4px">${desc}</div>`);
+  if (cat) parts.push(`<span style="opacity:.6;font-size:12px">${escapeHtml(cat)}</span>`);
+  if (desc) parts.push(`<div style="margin-top:4px">${escapeHtml(desc)}</div>`);
+  const trimmedLink = link?.trim();
+  if (trimmedLink && /^https?:\/\//i.test(trimmedLink)) {
+    parts.push(
+      `<a href="${escapeHref(trimmedLink)}" target="_blank" rel="noopener noreferrer" class="saved-location-popup-link">Open link</a>`,
+    );
+  }
   if (locationId != null) {
     parts.push(
       '<div class="saved-location-popup-actions">' +
@@ -148,10 +167,13 @@ export class MapSavedLocationsComponent implements OnDestroy {
           const label = props['label'] || '';
           const desc = props['description'] || '';
           const cat = props['category'] || '';
+          const link = props['link'] as string | undefined;
           const altitude = props['altitude'];
           const locationId = props['id'] as number | undefined;
 
-          layer.bindPopup(buildSavedLocationPopupHtml(label, cat, desc, altitude, locationId));
+          layer.bindPopup(
+            buildSavedLocationPopupHtml(label, cat, desc, link, altitude, locationId),
+          );
 
           if (locationId != null) {
             layer.on('click', () => {
@@ -165,7 +187,14 @@ export class MapSavedLocationsComponent implements OnDestroy {
               const editBtn = popupEl?.querySelector<HTMLButtonElement>('.saved-location-edit-btn');
               const deleteHandler = () => this.deleteSavedLocation(locationId, layer);
               const editHandler = () =>
-                this.openEditLocationDialog(locationId, label, cat, desc ?? '', layer);
+                this.openEditLocationDialog(
+                  locationId,
+                  label,
+                  cat,
+                  desc ?? '',
+                  link ?? '',
+                  layer,
+                );
               deleteBtn?.addEventListener('click', deleteHandler);
               editBtn?.addEventListener('click', editHandler);
               layer.once('popupclose', () => {
@@ -205,6 +234,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
     name: string,
     category: string,
     description: string,
+    link: string,
     layer: L.Layer,
   ): void {
     const ref = this.dialog.open(AddLocationDialogComponent, {
@@ -213,6 +243,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
         initialName: name,
         initialCategory: category,
         initialDescription: description,
+        initialLink: link,
       },
       width: '360px',
     });
@@ -224,6 +255,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
           name: result.name,
           category: result.category,
           description: result.description,
+          link: result.link,
         })
         .then(() => {
           (layer as L.Marker).closePopup();
@@ -274,7 +306,15 @@ export class MapSavedLocationsComponent implements OnDestroy {
         if (!result) return;
         const uuid = this.mapUuid();
         this.locationService
-          .savePoint(uuid, lat, lng, result.name, result.category, result.description)
+          .savePoint(
+            uuid,
+            lat,
+            lng,
+            result.name,
+            result.category,
+            result.description,
+            result.link,
+          )
           .then(() => this.loadSavedLocations())
           .catch((err) => console.error('Failed to save location', err));
       });

@@ -98,6 +98,17 @@
     }
   }
 
+  .saved-location-popup-link {
+    display: inline-block;
+    margin-top: 6px;
+    color: #1565c0;
+    text-decoration: none;
+    font-size: 13px;
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+
   .saved-location-popup-actions {
     margin-top: 8px;
     display: flex;

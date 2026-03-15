@@ -42,6 +42,7 @@ class LocationSerializer(serializers.ModelSerializer):
             "altitude",
             "wikidata_id",
             "description",
+            "link",
             "category",
             "geometry_type",
             "coordinates",

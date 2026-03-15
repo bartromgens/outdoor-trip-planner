@@ -65,6 +65,7 @@ class Location(models.Model):
     altitude = models.FloatField(null=True, blank=True)
     wikidata_id = models.CharField(max_length=20, blank=True, default="")
     description = models.TextField(blank=True, default="")
+    link = models.URLField(max_length=500, blank=True, default="")
     category = models.CharField(max_length=100, blank=True, default="")
     geometry_type = models.CharField(
         max_length=10, choices=GEOMETRY_TYPES, default="point"

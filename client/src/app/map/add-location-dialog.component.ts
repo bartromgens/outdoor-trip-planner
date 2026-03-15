@@ -14,12 +14,14 @@ export interface AddLocationDialogData {
   initialName?: string;
   initialCategory?: string;
   initialDescription?: string;
+  initialLink?: string;
 }
 
 export interface AddLocationDialogResult {
   name: string;
   category: string;
   description: string;
+  link: string;
 }
 
 @Component({
@@ -61,6 +63,11 @@ export interface AddLocationDialogResult {
           <mat-label>Description</mat-label>
           <textarea matInput formControlName="description" rows="3"></textarea>
         </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Link (optional)</mat-label>
+          <input matInput formControlName="link" type="url" placeholder="https://..." autocomplete="off" />
+        </mat-form-field>
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -98,6 +105,7 @@ export class AddLocationDialogComponent {
     }),
     category: new FormControl(this.data.initialCategory ?? '', { nonNullable: true }),
     description: new FormControl(this.data.initialDescription ?? '', { nonNullable: true }),
+    link: new FormControl(this.data.initialLink ?? '', { nonNullable: true }),
   });
 
   submit(): void {
@@ -109,6 +117,7 @@ export class AddLocationDialogComponent {
       name: this.form.controls.name.value,
       category: this.form.controls.category.value,
       description: this.form.controls.description.value,
+      link: this.form.controls.link.value.trim(),
     };
     this.dialogRef.close(result);
   }
