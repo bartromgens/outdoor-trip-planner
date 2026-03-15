@@ -5,6 +5,7 @@ import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/materia
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { LOCATION_CATEGORIES } from './location-categories';
 
 export interface AddLocationDialogData {
   lat?: number;
@@ -20,18 +21,6 @@ export interface AddLocationDialogResult {
   category: string;
   description: string;
 }
-
-const CATEGORIES = [
-  { value: '', label: '— none —' },
-  { value: 'peak', label: 'Peak' },
-  { value: 'hut', label: 'Hut' },
-  { value: 'campsite', label: 'Campsite' },
-  { value: 'trail', label: 'Trail' },
-  { value: 'water', label: 'Water' },
-  { value: 'viewpoint', label: 'Viewpoint' },
-  { value: 'parking', label: 'Parking' },
-  { value: 'station', label: 'Station' },
-];
 
 @Component({
   selector: 'app-add-location-dialog',
@@ -99,7 +88,7 @@ export class AddLocationDialogComponent {
   readonly data = inject<AddLocationDialogData>(MAT_DIALOG_DATA);
   private readonly dialogRef = inject(MatDialogRef<AddLocationDialogComponent>);
 
-  readonly categories = CATEGORIES;
+  readonly categories = LOCATION_CATEGORIES;
   readonly dialogTitle = this.data.title ?? 'Add location';
 
   readonly form = new FormGroup({

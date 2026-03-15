@@ -20,24 +20,7 @@ import {
   POPUP_SAVE_BTN_CLASS,
 } from './map-save-popup.helper';
 import { circleMarkerIcon } from './map-marker-icons';
-
-const CATEGORY_COLORS: Record<string, string> = {
-  trail: '#e65100',
-  hut: '#bf360c',
-  campsite: '#33691e',
-  peak: '#4a148c',
-  water: '#01579b',
-  parking: '#37474f',
-  viewpoint: '#f57f17',
-  station: '#0d47a1',
-  transit_route: '#1565c0',
-};
-
-const DEFAULT_COLOR = '#1976d2';
-
-function colorForCategory(category?: string): string {
-  return (category && CATEGORY_COLORS[category]) || DEFAULT_COLOR;
-}
+import { colorForCategory } from './location-categories';
 
 function iconForCategory(category?: string): L.DivIcon {
   return circleMarkerIcon({
