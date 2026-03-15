@@ -1,4 +1,13 @@
-import { Component, inject, input, output, NgZone, ChangeDetectorRef, OnDestroy } from '@angular/core';
+import {
+  Component,
+  inject,
+  input,
+  output,
+  effect,
+  NgZone,
+  ChangeDetectorRef,
+  OnDestroy,
+} from '@angular/core';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
 import { MatDialog } from '@angular/material/dialog';
@@ -53,6 +62,8 @@ export class HikePlanningComponent implements OnDestroy {
   private cdr = inject(ChangeDetectorRef);
 
   mapUuid = input.required<string>();
+  hikePlanningActive = input<boolean>(false);
+  readonly hikePlanningActiveChange = output<boolean>();
   readonly elevationProfile = output<[number, number][] | null>();
 
   private map!: L.Map;
@@ -64,9 +75,14 @@ export class HikePlanningComponent implements OnDestroy {
   private lastHikeDirectionsResult: HikeDirectionsResult | null = null;
   private savedHikesLayer?: L.LayerGroup;
 
-  hikePlanningActive = false;
   hikeLoading = false;
   editingRouteId: number | null = null;
+
+  constructor() {
+    effect(() => {
+      if (!this.hikePlanningActive() && this.map) this.clearHikeRoute();
+    });
+  }
 
   get hikeRouteLayer(): L.GeoJSON | undefined {
     return this._hikeRouteLayer;
@@ -76,13 +92,6 @@ export class HikePlanningComponent implements OnDestroy {
     this.map = map;
     this.layerControl = layerControl;
     this.map.on('click', (e: L.LeafletMouseEvent) => this.onHikeMapClick(e));
-  }
-
-  toggleHikePlanning(): void {
-    this.hikePlanningActive = !this.hikePlanningActive;
-    if (!this.hikePlanningActive) {
-      this.clearHikeRoute();
-    }
   }
 
   clearHikeRoute(): void {
@@ -137,9 +146,7 @@ export class HikePlanningComponent implements OnDestroy {
     try {
       await this.hikeRouteService.delete(uuid, id);
       if (this.editingRouteId === id) {
-        this.clearHikeRoute();
-        this.hikePlanningActive = false;
-        this.cdr.detectChanges();
+        this.hikePlanningActiveChange.emit(false);
       }
       await this.loadSavedHikes();
     } catch {
@@ -148,8 +155,8 @@ export class HikePlanningComponent implements OnDestroy {
   }
 
   editSavedRoute(route: SavedHikeRoute): void {
+    this.hikePlanningActiveChange.emit(true);
     this.clearHikeRoute();
-    this.hikePlanningActive = true;
     this.editingRouteId = route.id;
     for (const [lon, lat] of route.waypoints) {
       const latlng = L.latLng(lat, lon);
@@ -237,7 +244,7 @@ export class HikePlanningComponent implements OnDestroy {
   }
 
   private onHikeMapClick(e: L.LeafletMouseEvent): void {
-    if (!this.hikePlanningActive) return;
+    if (!this.hikePlanningActive()) return;
     this.addHikeWaypoint(e.latlng);
   }
 

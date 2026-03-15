@@ -1,7 +1,7 @@
 <div
   id="map"
   [class.map--adding]="addingLocation"
-  [class.map--hike-planning]="hikePlanning.hikePlanningActive"
+  [class.map--hike-planning]="hikePlanningActive"
 ></div>
 
 <app-map-reachability
@@ -12,6 +12,8 @@
 <app-hike-planning
   #hikePlanning
   [mapUuid]="currentMapUuid"
+  [hikePlanningActive]="hikePlanningActive"
+  (hikePlanningActiveChange)="onHikePlanningActiveChange($event)"
   (elevationProfile)="activeElevationProfile.set($event)"
 ></app-hike-planning>
 <app-elevation-profile
@@ -28,7 +30,7 @@
 
 <app-map-controls
   [addingLocation]="addingLocation"
-  [hikePlanningActive]="hikePlanning.hikePlanningActive"
+  [hikePlanningActive]="hikePlanningActive"
   [hasHikingRanges]="reachability.hasHikingRanges()"
   [hikeRouteLayer]="hikePlanning.hikeRouteLayer"
   [editingRouteId]="hikePlanning.editingRouteId"

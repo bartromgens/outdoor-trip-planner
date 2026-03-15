@@ -104,6 +104,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
 
   currentMapUuid = '';
   addingLocation = false;
+  hikePlanningActive = false;
   activeElevationProfile = signal<[number, number][] | null>(null);
 
   constructor() {
@@ -302,7 +303,11 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   onHikePlanningToggle(): void {
-    setTimeout(() => this.hikePlanningComp.toggleHikePlanning(), 0);
+    this.hikePlanningActive = !this.hikePlanningActive;
+  }
+
+  onHikePlanningActiveChange(value: unknown): void {
+    this.hikePlanningActive = value === true;
   }
 
   onLocationRangesRequested(locationId: number): void {
