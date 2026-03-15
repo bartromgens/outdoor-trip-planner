@@ -71,6 +71,35 @@ function savedIconForCategory(category?: string): L.DivIcon {
   });
 }
 
+function geoJsonLayerStyle(feature?: GeoJSON.Feature): L.PathOptions {
+  const cat = feature?.properties?.['category'];
+  return { color: colorForCategory(cat), weight: 3, opacity: 0.8 };
+}
+
+function buildSavedLocationPopupHtml(
+  label: string,
+  cat: string,
+  desc: string,
+  altitude: number | null | undefined,
+  locationId: number | undefined,
+): string {
+  const parts = [`<b>${label}</b>`];
+  if (altitude != null) {
+    parts.push(`<span style="font-size:12px">Altitude: ${altitude} m</span>`);
+  }
+  if (cat) parts.push(`<span style="opacity:.6;font-size:12px">${cat}</span>`);
+  if (desc) parts.push(`<div style="margin-top:4px">${desc}</div>`);
+  if (locationId != null) {
+    parts.push(
+      '<div class="saved-location-popup-actions">' +
+        '<button class="saved-location-edit-btn" type="button">Edit</button>' +
+        '<button class="saved-location-delete-btn" type="button">Delete</button>' +
+        '</div>',
+    );
+  }
+  return parts.join('<br>');
+}
+
 @Component({
   selector: 'app-map-saved-locations',
   template: '',
@@ -85,18 +114,13 @@ export class MapSavedLocationsComponent implements OnDestroy {
   mapUuid = input.required<string>();
   addingLocation = input<boolean>(false);
   addingLocationChange = output<boolean>();
+  locationRangesRequested = output<number>();
 
   private map!: L.Map;
   private featureLayer?: L.GeoJSON;
   private savedLayer?: L.GeoJSON;
   private subscription?: Subscription;
   private lastLoadedLocations: SavedLocation[] = [];
-
-  locationRangesRequested = output<number>();
-
-  getLocationsInBounds(bounds: L.LatLngBounds): SavedLocation[] {
-    return this.lastLoadedLocations.filter((loc) => bounds.contains([loc.latitude, loc.longitude]));
-  }
 
   constructor() {
     effect(() => {
@@ -143,20 +167,9 @@ export class MapSavedLocationsComponent implements OnDestroy {
           const cat = props['category'] || '';
           const altitude = props['altitude'];
           const locationId = props['id'] as number | undefined;
-          const parts = [`<b>${label}</b>`];
-          if (altitude != null)
-            parts.push(`<span style="font-size:12px">Altitude: ${altitude} m</span>`);
-          if (cat) parts.push(`<span style="opacity:.6;font-size:12px">${cat}</span>`);
-          if (desc) parts.push(`<div style="margin-top:4px">${desc}</div>`);
-          if (locationId != null) {
-            parts.push(
-              '<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">' +
-                '<button class="saved-location-edit-btn" type="button" style="background:#1976d2;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">Edit</button>' +
-                '<button class="saved-location-delete-btn" type="button" style="background:#c62828;color:#fff;border:none;border-radius:4px;padding:4px 10px;font-size:12px;cursor:pointer">Delete</button>' +
-                '</div>',
-            );
-          }
-          layer.bindPopup(parts.join('<br>'));
+
+          layer.bindPopup(buildSavedLocationPopupHtml(label, cat, desc, altitude, locationId));
+
           if (locationId != null) {
             layer.on('click', () => {
               this.ngZone.run(() => this.locationRangesRequested.emit(locationId as number));
@@ -167,16 +180,15 @@ export class MapSavedLocationsComponent implements OnDestroy {
                 '.saved-location-delete-btn',
               );
               const editBtn = popupEl?.querySelector<HTMLButtonElement>('.saved-location-edit-btn');
-              const onClose = () => {
-                deleteBtn?.removeEventListener('click', deleteHandler);
-                editBtn?.removeEventListener('click', editHandler);
-              };
               const deleteHandler = () => this.deleteSavedLocation(locationId, layer);
               const editHandler = () =>
                 this.openEditLocationDialog(locationId, label, cat, desc ?? '', layer);
               deleteBtn?.addEventListener('click', deleteHandler);
               editBtn?.addEventListener('click', editHandler);
-              layer.once('popupclose', onClose);
+              layer.once('popupclose', () => {
+                deleteBtn?.removeEventListener('click', deleteHandler);
+                editBtn?.removeEventListener('click', editHandler);
+              });
             });
             layer.on('dragend', (e: L.LeafletEvent) => {
               const marker = e.target as L.Marker;
@@ -187,14 +199,15 @@ export class MapSavedLocationsComponent implements OnDestroy {
             });
           }
         },
-        style: (feature) => {
-          const cat = feature?.properties?.['category'];
-          return { color: colorForCategory(cat), weight: 3, opacity: 0.8 };
-        },
+        style: geoJsonLayerStyle,
       }).addTo(this.map);
     } catch {
       // Silently ignore load errors on startup
     }
+  }
+
+  getLocationsInBounds(bounds: L.LatLngBounds): SavedLocation[] {
+    return this.lastLoadedLocations.filter((loc) => bounds.contains([loc.latitude, loc.longitude]));
   }
 
   ngOnDestroy(): void {
@@ -243,9 +256,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
     this.locationService
       .delete(uuid, locationId)
       .then(() => {
-        if (this.savedLayer) {
-          this.savedLayer.removeLayer(layer);
-        }
+        this.savedLayer?.removeLayer(layer);
         this.snackBar.open('Location deleted', 'Dismiss', { duration: 3000 });
       })
       .catch((err) => console.error('Failed to delete location', err));
@@ -317,14 +328,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
           );
         });
       },
-      style: (feature) => {
-        const cat = feature?.properties?.['category'];
-        return {
-          color: colorForCategory(cat),
-          weight: 3,
-          opacity: 0.8,
-        };
-      },
+      style: geoJsonLayerStyle,
     }).addTo(this.map);
 
     const bounds = this.featureLayer.getBounds();

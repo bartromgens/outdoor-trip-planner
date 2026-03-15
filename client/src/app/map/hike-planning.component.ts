@@ -182,7 +182,7 @@ export class HikePlanningComponent implements OnDestroy {
           `<div id="${popupId}">
             <b>${route.name}</b><br>
             <span style="font-size:12px">${distKm} km &mdash; ${dur}</span>
-            <div style="display:flex;gap:6px;margin-top:8px">
+            <div class="hike-popup-actions">
               <button class="hike-edit-btn" data-id="${route.id}" type="button">Edit</button>
               <button class="hike-delete-btn" data-id="${route.id}" type="button">Delete</button>
             </div>

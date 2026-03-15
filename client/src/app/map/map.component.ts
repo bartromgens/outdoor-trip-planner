@@ -17,6 +17,8 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { ChatService } from '../services/chat.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
 import { MapManagerService } from '../services/map-manager.service';
+import { MapUrlService } from '../services/map-url.service';
+import { MapTileLayerService } from '../services/map-tile-layer.service';
 import { LocationSearchService, type GeocodeResult } from '../services/location-search.service';
 import { LocationService } from '../services/location.service';
 import type { BoundingBox } from '../services/chat.service';
@@ -25,7 +27,6 @@ import {
   handleSaveLocationClick,
   POPUP_SAVE_BTN_CLASS,
 } from './map-save-popup.helper';
-import { environment } from '../../environments/environment';
 import { MapControlsComponent } from './map-controls.component';
 import { HikePlanningComponent } from './hike-planning.component';
 import { MapReachabilityComponent } from './map-reachability.component';
@@ -50,44 +51,6 @@ const CONTOUR_CONFIGS: ContourConfig[] = [
   { level: 3000, label: 'Contour 3000 m', color: '#4a1500', weight: 3 },
 ];
 
-const THUNDERFOREST_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://www.thunderforest.com/">Thunderforest</a>';
-
-const TRACESTRACK_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://www.tracestrack.com/">Tracestrack</a>';
-
-function buildThunderforestLayer(style: string): L.TileLayer | null {
-  const key = environment.thunderforestApiKey;
-  if (!key) return null;
-  return L.tileLayer(`https://tile.thunderforest.com/${style}/{z}/{x}/{y}.png?apikey=${key}`, {
-    attribution: THUNDERFOREST_ATTRIBUTION,
-    maxZoom: 22,
-  });
-}
-
-function buildTracestrackTopoLayer(): L.TileLayer | null {
-  const key = environment.tracestrackApiKey;
-  if (!key) return null;
-  return L.tileLayer(
-    `https://tile.tracestrack.com/topo__/{z}/{x}/{y}.png?key=${encodeURIComponent(key)}`,
-    {
-      attribution: TRACESTRACK_ATTRIBUTION,
-      maxZoom: 19,
-      tileSize: 512,
-      zoomOffset: -1,
-    },
-  );
-}
-
-function buildTransportLayer(): L.TileLayer {
-  const layer = buildThunderforestLayer('transport');
-  if (layer) return layer;
-  return L.tileLayer('https://tile.memomaps.de/tilegen/{z}/{x}/{y}.png', {
-    attribution:
-      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors, Tiles <a href="https://memomaps.de/">memomaps</a>',
-  });
-}
-
 @Component({
   selector: 'app-map',
   templateUrl: './map.component.html',
@@ -108,6 +71,10 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
   private cdr = inject(ChangeDetectorRef);
+  private mapUrl = inject(MapUrlService);
+  private tileLayerService = inject(MapTileLayerService);
+  private locationSearch = inject(LocationSearchService);
+  private locationService = inject(LocationService);
 
   @ViewChild('hikePlanning') private hikePlanningComp!: HikePlanningComponent;
   @ViewChild('reachability') private reachabilityComp!: MapReachabilityComponent;
@@ -123,8 +90,6 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private mapReady = false;
   private syncUrlTimer: ReturnType<typeof setTimeout> | null = null;
   private searchResultMarker: L.Marker | null = null;
-  private locationSearch = inject(LocationSearchService);
-  private locationService = inject(LocationService);
 
   currentMapUuid = '';
   addingLocation = false;
@@ -153,44 +118,15 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    const urlParams = this.readUrlParams();
+    const urlParams = this.mapUrl.read();
 
     this.map = L.map('map').setView(
       [urlParams.lat ?? 46.8182, urlParams.lng ?? 8.2275],
       urlParams.z ?? 8,
     );
 
-    const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution:
-        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    });
-
-    const transportLayer = buildTransportLayer();
-
-    const satelliteLayer = L.tileLayer(
-      'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      {
-        attribution:
-          'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
-        maxZoom: 19,
-      },
-    );
-
-    const landscapeLayer = buildThunderforestLayer('landscape');
-    const outdoorsLayer = buildThunderforestLayer('outdoors');
-    const tracestrackTopoLayer = buildTracestrackTopoLayer();
-
-    const baseLayerConfig: Record<string, L.Layer> = {
-      Standard: osmLayer,
-      Satellite: satelliteLayer,
-      Transport: transportLayer,
-      ...(landscapeLayer && { Landscape: landscapeLayer }),
-      ...(outdoorsLayer && { Outdoors: outdoorsLayer }),
-      ...(tracestrackTopoLayer && { Topo: tracestrackTopoLayer }),
-    };
-    for (const [name, layer] of Object.entries(baseLayerConfig)) {
-      this.baseLayers.set(name, layer);
-    }
+    const baseLayerConfig = this.tileLayerService.buildBaseLayers();
+    this.baseLayers = new Map(Object.entries(baseLayerConfig));
 
     this.activeBaseLayerName =
       urlParams.base && this.baseLayers.has(urlParams.base) ? urlParams.base : 'Standard';
@@ -296,51 +232,19 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  private readUrlParams(): {
-    lat?: number;
-    lng?: number;
-    z?: number;
-    base?: string;
-    overlays?: string[];
-    departure?: string;
-  } {
-    const params = new URLSearchParams(window.location.search);
-    const lat = params.get('lat');
-    const lng = params.get('lng');
-    const z = params.get('z');
-    return {
-      lat: lat !== null ? Number(lat) : undefined,
-      lng: lng !== null ? Number(lng) : undefined,
-      z: z !== null ? Number(z) : undefined,
-      base: params.get('base') ?? undefined,
-      overlays: params.has('overlays')
-        ? params.get('overlays')!.split(',').filter(Boolean)
-        : undefined,
-      departure: params.get('departure') ?? undefined,
-    };
-  }
-
   private debouncedSyncUrl(): void {
     if (this.syncUrlTimer) clearTimeout(this.syncUrlTimer);
-    this.syncUrlTimer = setTimeout(() => this.writeUrlParams(), 300);
-  }
-
-  private writeUrlParams(): void {
-    if (!this.mapReady) return;
-    const center = this.map.getCenter();
-    const params = new URLSearchParams();
-    params.set('lat', center.lat.toFixed(4));
-    params.set('lng', center.lng.toFixed(4));
-    params.set('z', String(this.map.getZoom()));
-    params.set('base', this.activeBaseLayerName);
-    if (this.activeOverlayNames.size) {
-      params.set('overlays', [...this.activeOverlayNames].sort().join(','));
-    }
-    const departure = this.tripDateTime.inputValue();
-    if (departure) {
-      params.set('departure', departure);
-    }
-    history.replaceState(null, '', `${window.location.pathname}?${params.toString()}`);
+    this.syncUrlTimer = setTimeout(() => {
+      if (!this.mapReady) return;
+      const center = this.map.getCenter();
+      this.mapUrl.write(
+        center.lat,
+        center.lng,
+        this.map.getZoom(),
+        this.activeBaseLayerName,
+        this.activeOverlayNames,
+      );
+    }, 300);
   }
 
   private async loadContourLayers(): Promise<void> {

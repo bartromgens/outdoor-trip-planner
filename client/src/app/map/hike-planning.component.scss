@@ -1,22 +1,5 @@
+@use 'map-shared' as *;
+
 :host {
   display: contents;
-}
-
-.map-loading-overlay {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1001;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-  border-radius: 6px;
-  padding: 6px 16px;
-  pointer-events: none;
-
-  &__text {
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-  }
 }

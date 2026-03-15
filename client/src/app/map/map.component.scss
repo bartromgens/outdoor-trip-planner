@@ -15,129 +15,26 @@
   cursor: crosshair;
 }
 
-.map-loading-overlay {
-  position: absolute;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 1001;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
-  border-radius: 6px;
-  padding: 6px 16px;
-  pointer-events: none;
-
-  &__text {
-    font-size: 13px;
-    font-weight: 500;
-    letter-spacing: 0.01em;
-  }
-}
-
-/* Reachability popup button – rendered in Leaflet DOM outside Angular */
-:host ::ng-deep .reachability-trigger-btn {
-  background: #1976d2;
+// Base mixin for all Leaflet popup action buttons rendered outside Angular
+@mixin popup-btn-base($padding: 4px 10px) {
   color: #fff;
   border: none;
   border-radius: 4px;
-  padding: 5px 12px;
   font-size: 12px;
   cursor: pointer;
-  width: 100%;
+  padding: $padding;
+}
+
+@mixin popup-btn($bg, $hover-bg, $padding: 4px 10px) {
+  @include popup-btn-base($padding);
+  background: $bg;
 
   &:hover {
-    background: #1565c0;
+    background: $hover-bg;
   }
 }
 
-/* Hike isochrone popup button – rendered in Leaflet DOM outside Angular */
-:host ::ng-deep .isochrone-trigger-btn {
-  background: #2e7d32;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 5px 12px;
-  font-size: 12px;
-  cursor: pointer;
-  width: 100%;
-
-  &:hover {
-    background: #1b5e20;
-  }
-}
-
-/* Saved hike popup buttons – rendered in Leaflet DOM outside Angular */
-:host ::ng-deep .hike-edit-btn {
-  background: #00695c;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  flex: 1;
-
-  &:hover {
-    background: #004d40;
-  }
-}
-
-:host ::ng-deep .hike-delete-btn {
-  background: #c62828;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  flex: 1;
-
-  &:hover {
-    background: #b71c1c;
-  }
-}
-
-/* Popup save button – rendered in Leaflet DOM outside Angular */
-:host ::ng-deep .popup-save-btn {
-  background: #1976d2;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  white-space: nowrap;
-
-  &:hover:not(:disabled) {
-    background: #1565c0;
-  }
-
-  &:disabled {
-    cursor: default;
-    opacity: 0.8;
-  }
-
-  &--saved {
-    background: #388e3c;
-  }
-}
-
-/* Saved location popup actions – rendered in Leaflet DOM */
-:host ::ng-deep .saved-location-popup-actions {
-  margin-top: 8px;
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-:host ::ng-deep .saved-location-edit-btn {
-  background: #1976d2;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
+@mixin with-material-icon {
   display: inline-flex;
   align-items: center;
 
@@ -146,30 +43,69 @@
     font-size: 16px;
     margin-right: 4px;
   }
-
-  &:hover {
-    background: #1565c0;
-  }
 }
 
-:host ::ng-deep .saved-location-delete-btn {
-  background: #c62828;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  padding: 4px 10px;
-  font-size: 12px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-
-  .material-icons {
-    font-family: 'Material Icons';
-    font-size: 16px;
-    margin-right: 4px;
+/* Leaflet popup buttons – rendered in Leaflet DOM outside Angular */
+:host ::ng-deep {
+  .reachability-trigger-btn {
+    @include popup-btn(#1976d2, #1565c0, 5px 12px);
+    width: 100%;
   }
 
-  &:hover {
-    background: #b71c1c;
+  .isochrone-trigger-btn {
+    @include popup-btn(#2e7d32, #1b5e20, 5px 12px);
+    width: 100%;
+  }
+
+  .hike-popup-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+
+  .hike-edit-btn {
+    @include popup-btn(#00695c, #004d40);
+    flex: 1;
+  }
+
+  .hike-delete-btn {
+    @include popup-btn(#c62828, #b71c1c);
+    flex: 1;
+  }
+
+  .popup-save-btn {
+    @include popup-btn-base;
+    background: #1976d2;
+    white-space: nowrap;
+
+    &:hover:not(:disabled) {
+      background: #1565c0;
+    }
+
+    &:disabled {
+      cursor: default;
+      opacity: 0.8;
+    }
+
+    &--saved {
+      background: #388e3c;
+    }
+  }
+
+  .saved-location-popup-actions {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .saved-location-edit-btn {
+    @include popup-btn(#1976d2, #1565c0);
+    @include with-material-icon;
+  }
+
+  .saved-location-delete-btn {
+    @include popup-btn(#c62828, #b71c1c);
+    @include with-material-icon;
   }
 }
