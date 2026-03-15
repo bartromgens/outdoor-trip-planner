@@ -45,6 +45,21 @@ def _get_map_or_404(uuid: UUID) -> Map:
         raise NotFound("Map not found")
 
 
+def _wikidata_extras(validated_data: dict) -> dict:
+    extra: dict = {}
+    if not validated_data.get("wikidata_id"):
+        try:
+            info = find_place_info(validated_data["name"])
+            if info:
+                if info["wikidata_id"]:
+                    extra["wikidata_id"] = info["wikidata_id"]
+                if info["elevation_m"] is not None and not validated_data.get("altitude"):
+                    extra["altitude"] = info["elevation_m"]
+        except Exception:
+            logger.warning("Wikidata enrichment failed for %r", validated_data["name"])
+    return extra
+
+
 @api_view(["GET"])
 def health_check(request: Request) -> Response:
     return Response({"status": "ok"})
@@ -181,22 +196,7 @@ def locations(request: Request) -> Response:
         )
         raise serializers.ValidationError(serializer.errors)
 
-    extra: dict = {}
-    if not serializer.validated_data.get("wikidata_id"):
-        try:
-            info = find_place_info(serializer.validated_data["name"])
-            if info:
-                if info["wikidata_id"]:
-                    extra["wikidata_id"] = info["wikidata_id"]
-                if info[
-                    "elevation_m"
-                ] is not None and not serializer.validated_data.get("altitude"):
-                    extra["altitude"] = info["elevation_m"]
-        except Exception:
-            logger.warning(
-                "Wikidata enrichment failed for %r", serializer.validated_data["name"]
-            )
-
+    extra = _wikidata_extras(serializer.validated_data)
     serializer.save(**extra)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 
@@ -534,22 +534,7 @@ def map_locations(request: Request, uuid: UUID) -> Response:
         )
         raise serializers.ValidationError(serializer.errors)
 
-    extra: dict = {}
-    if not serializer.validated_data.get("wikidata_id"):
-        try:
-            info = find_place_info(serializer.validated_data["name"])
-            if info:
-                if info["wikidata_id"]:
-                    extra["wikidata_id"] = info["wikidata_id"]
-                if info[
-                    "elevation_m"
-                ] is not None and not serializer.validated_data.get("altitude"):
-                    extra["altitude"] = info["elevation_m"]
-        except Exception:
-            logger.warning(
-                "Wikidata enrichment failed for %r", serializer.validated_data["name"]
-            )
-
+    extra = _wikidata_extras(serializer.validated_data)
     serializer.save(map=map_obj, **extra)
     return Response(serializer.data, status=status.HTTP_201_CREATED)
 

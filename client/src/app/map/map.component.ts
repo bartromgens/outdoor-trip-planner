@@ -47,6 +47,11 @@ interface ContourConfig {
 const DEFAULT_CONTOUR_LEVEL = 2000;
 const MOBILE_BREAKPOINT = '(max-width: 768px)';
 
+function searchResultLocationName(fullLabel: string): string {
+  const beforeComma = fullLabel.split(',')[0];
+  return beforeComma?.trim() ?? fullLabel;
+}
+
 const CONTOUR_CONFIGS: ContourConfig[] = [
   { level: 1500, label: 'Contour 1500 m', color: '#a0522d', weight: 1.5, dashArray: '6 4' },
   { level: 1750, label: 'Contour 1750 m', color: '#964b1a', weight: 1.8, dashArray: '7 4' },
@@ -315,12 +320,13 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
       this.searchResultMarker = null;
     }
     const latlng: L.LatLngExpression = [result.lat, result.lon];
+    const locationName = searchResultLocationName(result.label);
     const feature: GeoJSON.Feature<GeoJSON.Point> = {
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [result.lon, result.lat] },
-      properties: { label: result.label },
+      properties: { label: locationName },
     };
-    const popupContent = buildSaveLocationPopupContent(result.label);
+    const popupContent = buildSaveLocationPopupContent(locationName);
     this.searchResultMarker = L.marker(latlng, {
       icon: circleMarkerIcon({ color: '#1976d2', size: 14 }),
     })
