@@ -18,6 +18,12 @@ ssh "$HOST" bash <<EOF
   set -euo pipefail
   cd $REMOTE_DIR
 
+  if [[ -f db.sqlite3 ]]; then
+    BACKUP_NAME="db.sqlite3.bak.\$(date +%Y%m%d-%H%M%S)"
+    echo "Backing up database to \$BACKUP_NAME..."
+    cp db.sqlite3 "\$BACKUP_NAME"
+  fi
+
   echo "Pulling latest changes..."
   git pull
 
