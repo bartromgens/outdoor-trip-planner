@@ -247,6 +247,10 @@ def contour(request: Request, elevation: int) -> Response:
 
 DEFAULT_REACHABILITY_DATETIME = datetime(2026, 6, 23, 7, 0, 0, tzinfo=timezone.UTC)
 
+REACHABILITY_ISOCHRONE_EXCLUDED_CATEGORIES = frozenset(
+    {"supermarket", "water", "viewpoint", "trail", "peak", "parking", "hut", "campsite"}
+)
+
 
 def _parse_query_datetime(time_str: str | None) -> datetime:
     if not time_str:
@@ -571,6 +575,11 @@ def location_hike_isochrone(request: Request, uuid: UUID, pk: int) -> Response:
         return Response(
             {"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND
         )
+    if loc.category in REACHABILITY_ISOCHRONE_EXCLUDED_CATEGORIES:
+        return Response(
+            {"error": "Reachability/isochrones not available for this location type"},
+            status=status.HTTP_404_NOT_FOUND,
+        )
     cache = LocationIsochroneCache.objects.filter(location=loc).first()
     if cache is not None:
         return Response(cache.data)
@@ -604,6 +613,11 @@ def location_reachability(request: Request, uuid: UUID, pk: int) -> Response:
     except Location.DoesNotExist:
         return Response(
             {"error": "Location not found"}, status=status.HTTP_404_NOT_FOUND
+        )
+    if loc.category in REACHABILITY_ISOCHRONE_EXCLUDED_CATEGORIES:
+        return Response(
+            {"error": "Reachability/isochrones not available for this location type"},
+            status=status.HTTP_404_NOT_FOUND,
         )
     time_str = request.query_params.get("time", "")
     cache = LocationReachabilityCache.objects.filter(location=loc).first()

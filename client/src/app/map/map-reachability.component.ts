@@ -9,6 +9,7 @@ import {
 import { LocationService, type SavedLocation } from '../services/location.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
 import { circleMarkerIcon } from './map-marker-icons';
+import { showReachabilityIsochronesForCategory } from './location-categories';
 
 const CACHE_USE_RADIUS_M = 500;
 
@@ -243,7 +244,9 @@ export class MapReachabilityComponent {
       const mapUuid = this.mapUuid();
       const locations = mapUuid ? await this.locationService.getAll(mapUuid) : [];
       const cachedLoc = findLocationWithinRadius(locations, lat, lng, CACHE_USE_RADIUS_M);
-      const result = cachedLoc
+      const useCachedLoc =
+        cachedLoc && showReachabilityIsochronesForCategory(cachedLoc.category);
+      const result = useCachedLoc
         ? await this.transportService.getLocationHikeIsochrone(mapUuid, cachedLoc.id)
         : await this.transportService.getHikeIsochrone(lat, lng);
       this.renderIsochroneLayer(result);

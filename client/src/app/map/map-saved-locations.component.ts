@@ -20,7 +20,10 @@ import {
   POPUP_SAVE_BTN_CLASS,
 } from './map-save-popup.helper';
 import { circleMarkerIcon } from './map-marker-icons';
-import { colorForCategory } from './location-categories';
+import {
+  colorForCategory,
+  showReachabilityIsochronesForCategory,
+} from './location-categories';
 
 function iconForCategory(category?: string): L.DivIcon {
   return circleMarkerIcon({
@@ -177,7 +180,11 @@ export class MapSavedLocationsComponent implements OnDestroy {
 
           if (locationId != null) {
             layer.on('click', () => {
-              this.ngZone.run(() => this.locationRangesRequested.emit(locationId as number));
+              if (showReachabilityIsochronesForCategory(cat)) {
+                this.ngZone.run(() =>
+                  this.locationRangesRequested.emit(locationId as number),
+                );
+              }
             });
             layer.on('popupopen', (e: L.PopupEvent) => {
               const popupEl = e.popup.getElement();
