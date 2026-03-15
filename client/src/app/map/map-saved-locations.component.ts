@@ -312,10 +312,8 @@ export class MapSavedLocationsComponent implements OnDestroy {
       .catch((err) => console.error('Failed to update location position', err));
   }
 
-  private addLocationClickHandler = (e: L.LeafletMouseEvent): void => {
-    const { lat, lng } = e.latlng;
+  addLocationAt(lat: number, lng: number): void {
     this.ngZone.run(() => {
-      this.addingLocationChange.emit(false);
       const ref = this.dialog.open(AddLocationDialogComponent, {
         data: { lat, lng },
         width: '360px',
@@ -324,19 +322,17 @@ export class MapSavedLocationsComponent implements OnDestroy {
         if (!result) return;
         const uuid = this.mapUuid();
         this.locationService
-          .savePoint(
-            uuid,
-            lat,
-            lng,
-            result.name,
-            result.category,
-            result.description,
-            result.link,
-          )
+          .savePoint(uuid, lat, lng, result.name, result.category, result.description, result.link)
           .then(() => this.loadSavedLocations())
           .catch((err) => console.error('Failed to save location', err));
       });
     });
+  }
+
+  private addLocationClickHandler = (e: L.LeafletMouseEvent): void => {
+    const { lat, lng } = e.latlng;
+    this.addingLocationChange.emit(false);
+    this.addLocationAt(lat, lng);
   };
 
   private renderFeatures(fc: GeoJSON.FeatureCollection): void {

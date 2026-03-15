@@ -280,6 +280,10 @@ export class HikePlanningComponent implements OnDestroy {
     if (this.hikeRouteDebounceTimer) clearTimeout(this.hikeRouteDebounceTimer);
   }
 
+  addWaypointAt(lat: number, lng: number): void {
+    this.addHikeWaypoint(L.latLng(lat, lng));
+  }
+
   private onHikeMapClick(e: L.LeafletMouseEvent): void {
     if (!this.hikePlanningActive()) return;
     this.addHikeWaypoint(e.latlng);

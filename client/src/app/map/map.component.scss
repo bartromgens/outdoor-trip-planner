@@ -59,18 +59,70 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Left-click context menu popup */
+:host ::ng-deep .map-ctx-popup {
+  .leaflet-popup-content-wrapper {
+    padding: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+
+  .leaflet-popup-content {
+    margin: 0;
+    width: auto !important;
+  }
+
+  .leaflet-popup-tip-container {
+    display: none;
+  }
+}
+
+:host ::ng-deep .map-ctx-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 210px;
+
+  &__item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 16px;
+    background: #fff;
+    border: none;
+    border-bottom: 1px solid #f0f0f0;
+    cursor: pointer;
+    font-size: 14px;
+    font-family: inherit;
+    text-align: left;
+    color: #212121;
+    transition: background 0.12s;
+    white-space: nowrap;
+
+    &:last-child {
+      border-bottom: none;
+    }
+
+    &:hover {
+      background: #f5f5f5;
+    }
+
+    &:active {
+      background: #eeeeee;
+    }
+  }
+
+  &__icon {
+    font-family: 'Material Icons' !important;
+    font-size: 18px;
+    color: #757575;
+    font-style: normal;
+    line-height: 1;
+  }
+}
+
 /* Leaflet popup buttons – rendered in Leaflet DOM outside Angular */
 :host ::ng-deep {
-  .reachability-trigger-btn {
-    @include popup-btn(#1976d2, #1565c0, 5px 12px);
-    width: 100%;
-  }
-
-  .isochrone-trigger-btn {
-    @include popup-btn(#2e7d32, #1b5e20, 5px 12px);
-    width: 100%;
-  }
-
   .hike-popup-actions {
     display: flex;
     gap: 6px;

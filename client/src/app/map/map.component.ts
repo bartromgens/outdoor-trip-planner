@@ -8,6 +8,7 @@ import {
   effect,
   signal,
   ChangeDetectorRef,
+  NgZone,
 } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import * as L from 'leaflet';
@@ -81,6 +82,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private router = inject(Router);
   private snackBar = inject(MatSnackBar);
   private cdr = inject(ChangeDetectorRef);
+  private ngZone = inject(NgZone);
   private mapUrl = inject(MapUrlService);
   private tileLayerService = inject(MapTileLayerService);
   private locationSearch = inject(LocationSearchService);
@@ -174,6 +176,11 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     this.map.on('moveend', () => {
       this.emitBbox();
       this.debouncedSyncUrl();
+    });
+
+    this.map.on('contextmenu', (e: L.LeafletMouseEvent) => {
+      L.DomEvent.preventDefault(e.originalEvent);
+      this.onMapContextMenu(e);
     });
 
     this.hikePlanningComp.init(this.map, this.layerControl);
@@ -292,6 +299,60 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
         // Silently skip unavailable contour levels
       }
     }
+  }
+
+  private onMapContextMenu(e: L.LeafletMouseEvent): void {
+    if (this.addingLocation || this.hikePlanningActive) return;
+    const { lat, lng } = e.latlng;
+
+    const popup = L.popup({ closeButton: false, className: 'map-ctx-popup', offset: [0, -4] })
+      .setLatLng(e.latlng)
+      .setContent(
+        `<div class="map-ctx-menu">
+          <button class="map-ctx-menu__item" data-action="add-location">
+            <span class="map-ctx-menu__icon material-icons">add_location_alt</span>Add location
+          </button>
+          <button class="map-ctx-menu__item" data-action="plan-hike">
+            <span class="map-ctx-menu__icon material-icons">route</span>Plan hike
+          </button>
+          <button class="map-ctx-menu__item" data-action="transit-range">
+            <span class="map-ctx-menu__icon material-icons">directions_transit</span>Show transit range
+          </button>
+          <button class="map-ctx-menu__item" data-action="hike-ranges">
+            <span class="map-ctx-menu__icon material-icons">hiking</span>Show hike ranges
+          </button>
+        </div>`,
+      )
+      .openOn(this.map);
+
+    setTimeout(() => {
+      const el = popup.getElement();
+      if (!el) return;
+
+      el.querySelector('[data-action="add-location"]')?.addEventListener('click', () => {
+        this.map.closePopup();
+        this.ngZone.run(() => this.savedLocationsComp.addLocationAt(lat, lng));
+      });
+
+      el.querySelector('[data-action="plan-hike"]')?.addEventListener('click', () => {
+        this.map.closePopup();
+        this.ngZone.run(() => {
+          this.hikePlanningActive = true;
+          this.cdr.detectChanges();
+          this.hikePlanningComp.addWaypointAt(lat, lng);
+        });
+      });
+
+      el.querySelector('[data-action="transit-range"]')?.addEventListener('click', () => {
+        this.map.closePopup();
+        this.ngZone.run(() => this.reachabilityComp.loadReachability(lat, lng));
+      });
+
+      el.querySelector('[data-action="hike-ranges"]')?.addEventListener('click', () => {
+        this.map.closePopup();
+        this.ngZone.run(() => this.reachabilityComp.loadHikeIsochrone(lat, lng));
+      });
+    }, 0);
   }
 
   onAddLocationToggle(): void {

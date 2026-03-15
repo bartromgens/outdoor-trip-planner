@@ -205,7 +205,6 @@ export class MapReachabilityComponent {
   init(map: L.Map, layerControl: L.Control.Layers): void {
     this.map = map;
     this.layerControl = layerControl;
-    this.map.on('contextmenu', (e: L.LeafletMouseEvent) => this.onMapRightClick(e));
     this.transportService.getConfig().then((c) => {
       this.routingBackend = c.routingBackend;
       this.cdr.detectChanges();
@@ -244,57 +243,7 @@ export class MapReachabilityComponent {
     }
   }
 
-  private onMapRightClick(e: L.LeafletMouseEvent): void {
-    const { lat, lng } = e.latlng;
-    const departure = this.tripDateTime.departureTime();
-    const departureHint = departure
-      ? `<div style="font-size:11px;opacity:.65;margin-bottom:6px">9 slots (10 min intervals, 1.5 h) from ${formatDepartureTime(departure.toISOString())}</div>`
-      : '';
-    const popup = L.popup({ closeButton: true, minWidth: 180 })
-      .setLatLng(e.latlng)
-      .setContent(
-        `<div style="display:flex;flex-direction:column;gap:6px">
-          <div>
-            <div style="font-weight:600;margin-bottom:4px">Transit reachability</div>
-            ${departureHint}
-            <button class="reachability-trigger-btn" type="button">
-              Show stops within 60 min
-            </button>
-          </div>
-          <hr style="margin:2px 0;border:none;border-top:1px solid rgba(0,0,0,.12)">
-          <div>
-            <div style="font-weight:600;margin-bottom:4px">Hike isochrones</div>
-            <button class="isochrone-trigger-btn" type="button">
-              Show 1/2/3 h hiking range
-            </button>
-            ${this.routingBackend === 'ors' ? '<div style="font-size:10px;opacity:.6;margin-top:4px;line-height:1.3">Approximate — elevation not modelled</div>' : ''}
-          </div>
-        </div>`,
-      )
-      .openOn(this.map);
-
-    setTimeout(() => {
-      const reachBtn = popup
-        .getElement()
-        ?.querySelector<HTMLButtonElement>('.reachability-trigger-btn');
-      if (reachBtn) {
-        reachBtn.addEventListener('click', () => {
-          this.map.closePopup();
-          this.ngZone.run(() => this.loadReachability(lat, lng));
-        });
-      }
-
-      const isoBtn = popup.getElement()?.querySelector<HTMLButtonElement>('.isochrone-trigger-btn');
-      if (isoBtn) {
-        isoBtn.addEventListener('click', () => {
-          this.map.closePopup();
-          this.ngZone.run(() => this.loadHikeIsochrone(lat, lng));
-        });
-      }
-    }, 0);
-  }
-
-  private async loadReachability(lat: number, lng: number): Promise<void> {
+  async loadReachability(lat: number, lng: number): Promise<void> {
     this.reachabilityLoading = true;
     this.cdr.detectChanges();
     try {
@@ -312,7 +261,7 @@ export class MapReachabilityComponent {
     }
   }
 
-  private async loadHikeIsochrone(lat: number, lng: number): Promise<void> {
+  async loadHikeIsochrone(lat: number, lng: number): Promise<void> {
     this.isochroneLoading = true;
     this.cdr.detectChanges();
     try {
