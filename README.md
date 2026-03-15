@@ -1,6 +1,20 @@
 # Outdoor Trip Planner
 
-A full-stack web application built with Django + Django REST Framework (backend) and Angular + Angular Material (frontend).
+A full-stack web application for planning outdoor trips and hikes. Pin locations on an interactive map, plan hike routes with elevation profiles, and explore how far you can travel by public transit from any point. An AI assistant helps you discover and add points of interest hands-free.
+
+Built with Django + Django REST Framework (backend) and Angular + Angular Material (frontend).
+
+## Features
+
+- **Interactive map** — pan, zoom, and click to explore terrain using Leaflet with multiple tile layers
+- **Locations** — save and categorise points of interest (peaks, huts, campsites, villages, viewpoints, trails, and more) with optional descriptions and links; metadata is auto-enriched on save
+- **Hike route planning** — draw multi-waypoint routes on the map with turn-by-turn directions, distance, ascent/descent stats, and an interactive elevation profile
+- **Hike isochrones** — visualise how far you can walk from any location within 1 or 2 hours
+- **Public-transit reachability** — colour-coded overlay showing every transit stop reachable within 15–60 minutes from a chosen point, powered by [Transitous](https://transitous.org)
+- **Elevation contour lines** — toggleable contour overlays at 1 500 m, 1 750 m, 2 000 m, 2 500 m, and 3 000 m
+- **Location search / geocoding** — search for places by name and jump directly to them on the map
+- **AI chat assistant** — conversational assistant that can suggest locations, add them to the map, and answer questions about the current view; supports streaming responses
+- **Shareable trip maps** — each trip lives under a unique URL that can be shared with others
 
 ## Backend Setup
 
