@@ -37,6 +37,9 @@
 
 .sidenav-container {
   height: calc(100vh - 72px);
+  @supports (height: 100svh) {
+    height: calc(100svh - 72px);
+  }
 
   @media (max-width: 768px) {
     &.sidebar-open {
@@ -76,6 +79,10 @@ mat-sidenav-content {
   display: flex;
   flex-direction: column;
   position: relative;
+
+  @media (max-width: 768px) {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
 }
 
 .sidebar-toggle {
