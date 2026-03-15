@@ -8,7 +8,6 @@ import {
 } from '../services/transport.service';
 import { LocationService, type SavedLocation } from '../services/location.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
-import { circleMarkerIcon } from './map-marker-icons';
 import { showReachabilityIsochronesForCategory } from './location-categories';
 
 const CACHE_USE_RADIUS_M = 500;
@@ -72,16 +71,92 @@ function reachabilityColor(durationMin: number): string {
   return `hsl(122, 62%, ${lightness}%)`;
 }
 
-function reachabilityIcon(durationMin: number): L.DivIcon {
-  return circleMarkerIcon({
-    color: reachabilityColor(durationMin),
-    size: 13,
-    border: '2px solid rgba(255,255,255,0.85)',
+const MODE_ICONS: Record<string, string> = {
+  BUS: 'directions_bus',
+  COACH: 'directions_bus',
+  TRAM: 'tram',
+  SUBWAY: 'subway',
+  RAIL: 'train',
+  HIGHSPEED_RAIL: 'train',
+  LONG_DISTANCE: 'train',
+  NIGHT_RAIL: 'train',
+  REGIONAL_FAST_RAIL: 'train',
+  REGIONAL_RAIL: 'train',
+  SUBURBAN: 'train',
+  FERRY: 'directions_boat',
+  AIRPLANE: 'flight',
+  FUNICULAR: 'terrain',
+  AERIAL_LIFT: 'terrain',
+  ODM: 'local_taxi',
+  FLEX: 'directions_car',
+  OTHER: 'directions_transit',
+  TRANSIT: 'directions_transit',
+};
+
+function reachabilityModeIcon(modes: string[] | undefined): string {
+  const first = modes?.[0];
+  return (first && MODE_ICONS[first]) || MODE_ICONS['OTHER'];
+}
+
+function reachabilityIcon(durationMin: number, modes: string[] | undefined): L.DivIcon {
+  const color = reachabilityColor(durationMin);
+  const iconName = reachabilityModeIcon(modes);
+  const size = 22;
+  const iconSize = 14;
+  return L.divIcon({
+    className: 'reachability-marker',
+    html: `<div style="
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      width:${size}px;
+      height:${size}px;
+      border-radius:50%;
+      background:${color};
+      border:2px solid rgba(255,255,255,0.85);
+      box-shadow:0 1px 4px rgba(0,0,0,.45);
+    "><span style="font-family:'Material Icons';font-size:${iconSize}px;color:white;line-height:1;">${iconName}</span></div>`,
+    iconSize: [size, size],
+    iconAnchor: [size / 2, size / 2],
+    popupAnchor: [0, -size / 2],
   });
 }
 
 function formatDepartureTime(isoUtc: string): string {
   return new Date(isoUtc).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(text: string): string {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+const MODE_LABELS: Record<string, string> = {
+  BUS: 'Bus',
+  COACH: 'Coach',
+  TRAM: 'Tram',
+  SUBWAY: 'Subway',
+  RAIL: 'Rail',
+  HIGHSPEED_RAIL: 'High-speed rail',
+  LONG_DISTANCE: 'Long-distance',
+  NIGHT_RAIL: 'Night train',
+  REGIONAL_FAST_RAIL: 'Regional express',
+  REGIONAL_RAIL: 'Regional rail',
+  SUBURBAN: 'Suburban',
+  FERRY: 'Ferry',
+  AIRPLANE: 'Air',
+  FUNICULAR: 'Funicular',
+  AERIAL_LIFT: 'Gondola / cable car',
+  ODM: 'On-demand',
+  FLEX: 'Flex',
+  OTHER: 'Transit',
+};
+
+function formatReachabilityModes(modes: string[] | undefined): string {
+  if (!modes?.length) return '';
+  const labels = [...new Set(modes.map((m) => MODE_LABELS[m] ?? m.replace(/_/g, ' ')))];
+  return labels.join(', ');
 }
 
 @Component({
@@ -310,7 +385,9 @@ export class MapReachabilityComponent {
     const markers = features.map((f) => {
       const [lon, lat] = f.geometry.coordinates as [number, number];
       const props = f.properties;
-      const marker = L.marker([lat, lon], { icon: reachabilityIcon(props.duration_min) });
+      const marker = L.marker([lat, lon], {
+        icon: reachabilityIcon(props.duration_min, props.modes),
+      });
       const transferText =
         props.transfers === 0
           ? 'Direct'
@@ -320,9 +397,21 @@ export class MapReachabilityComponent {
       const timeText = props.best_time
         ? `<br><span style="font-size:11px;opacity:.65">Best at ${formatDepartureTime(props.best_time)}</span>`
         : '';
+      const modesText = formatReachabilityModes(props.modes);
+      const typeLine = modesText
+        ? `<br><span style="font-size:11px;opacity:.8">${modesText}</span>`
+        : '';
+      const arrivalLine =
+        props.arrival &&
+        `<br><span style="font-size:11px;opacity:.8">Arrive ${formatDepartureTime(props.arrival)}</span>`;
+      const trackLine =
+        props.track && `<br><span style="font-size:11px;opacity:.8">${escapeHtml(props.track)}</span>`;
+      const descLine =
+        props.description &&
+        `<br><span style="font-size:11px;opacity:.7">${escapeHtml(props.description)}</span>`;
       marker.bindPopup(
         `<b>${props.name}</b><br>
-        <span style="font-size:12px">${props.duration_min} min &mdash; ${transferText}</span>${timeText}`,
+        <span style="font-size:12px">${props.duration_min} min &mdash; ${transferText}</span>${typeLine}${arrivalLine ?? ''}${trackLine ?? ''}${descLine ?? ''}${timeText}`,
       );
       return marker;
     });

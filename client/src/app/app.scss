@@ -37,6 +37,12 @@
 
 .sidenav-container {
   height: calc(100vh - 72px);
+
+  @media (max-width: 768px) {
+    &.sidebar-open {
+      z-index: 10;
+    }
+  }
 }
 
 mat-sidenav {

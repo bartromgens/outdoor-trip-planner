@@ -12,7 +12,10 @@
   }
 </mat-toolbar>
 
-<mat-sidenav-container class="sidenav-container">
+<mat-sidenav-container
+  class="sidenav-container"
+  [class.sidebar-open]="isMobile() && sidenavOpened()"
+>
   <mat-sidenav
     #sidenav
     [mode]="sidenavMode()"

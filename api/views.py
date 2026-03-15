@@ -312,6 +312,11 @@ def _fetch_reachability(
                     "duration_min": duration_min,
                     "bucket": bucket,
                     "transfers": max(0, item.get("k", 1) - 1),
+                    "modes": place.get("modes") or [],
+                    "stop_id": place.get("stopId") or None,
+                    "arrival": place.get("arrival") or None,
+                    "track": place.get("track") or place.get("scheduledTrack") or None,
+                    "description": place.get("description") or None,
                 },
             }
         )

@@ -35,6 +35,11 @@ export interface ReachabilityStop {
   bucket: 15 | 30 | 45 | 60;
   transfers: number;
   best_time?: string;
+  modes?: string[];
+  stop_id?: string | null;
+  arrival?: string | null;
+  track?: string | null;
+  description?: string | null;
 }
 
 export interface ReachabilityResult {

@@ -51,6 +51,14 @@
   }
 }
 
+/* Reachability markers – transport mode icon in green duration circle */
+:host ::ng-deep .reachability-marker span {
+  font-family: 'Material Icons' !important;
+  font-weight: normal;
+  font-style: normal;
+  -webkit-font-smoothing: antialiased;
+}
+
 /* Leaflet popup buttons – rendered in Leaflet DOM outside Angular */
 :host ::ng-deep {
   .reachability-trigger-btn {
