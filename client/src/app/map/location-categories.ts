@@ -6,7 +6,7 @@ export interface LocationCategory {
 
 export const LOCATION_CATEGORIES: LocationCategory[] = [
   { value: '', label: '— none —', color: '#1976d2' },
-  { value: 'apartment', label: 'Apartment', color: '#5d4037' },
+  { value: 'apartment', label: 'Apartment', color: '#ec407a' },
   { value: 'bus-stop', label: 'Bus Stop', color: '#1565c0' },
   { value: 'campsite', label: 'Campsite', color: '#33691e' },
   { value: 'hut', label: 'Hut', color: '#bf360c' },
@@ -15,7 +15,7 @@ export const LOCATION_CATEGORIES: LocationCategory[] = [
   { value: 'supermarket', label: 'Supermarket', color: '#2e7d32' },
   { value: 'train-station', label: 'Train Station', color: '#0d47a1' },
   { value: 'trail', label: 'Trail', color: '#e65100' },
-  { value: 'village', label: 'Village', color: '#6d4c41' },
+  { value: 'village', label: 'Village', color: '#1976d2' },
   { value: 'viewpoint', label: 'Viewpoint', color: '#f57f17' },
   { value: 'water', label: 'Water', color: '#01579b' },
 ];
