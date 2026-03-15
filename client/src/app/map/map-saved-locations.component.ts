@@ -22,13 +22,15 @@ import {
 import { circleMarkerIcon } from './map-marker-icons';
 import {
   colorForCategory,
+  iconForCategory as getCategoryIcon,
   showReachabilityIsochronesForCategory,
 } from './location-categories';
 
 function iconForCategory(category?: string): L.DivIcon {
   return circleMarkerIcon({
     color: colorForCategory(category),
-    size: 12,
+    icon: getCategoryIcon(category),
+    size: 20,
     shadow: '0 1px 3px rgba(0,0,0,.4)',
     border: '2px solid #fff',
   });
@@ -36,24 +38,33 @@ function iconForCategory(category?: string): L.DivIcon {
 
 function savedIconForCategory(category?: string): L.DivIcon {
   const color = colorForCategory(category);
+  const iconName = getCategoryIcon(category);
+  const pinW = 24;
+  const pinH = 34;
   return L.divIcon({
     className: 'map-marker-saved',
     html: `<div style="
       position:relative;
-      width:16px;height:22px;
+      width:${pinW}px;height:${pinH}px;
     ">
       <div style="
+        position:relative;
         background:${color};
-        width:16px;height:16px;
+        width:${pinW}px;height:${pinW}px;
         border-radius:50% 50% 50% 0;
         transform:rotate(-45deg);
         border:2px solid #fff;
         box-shadow:0 2px 4px rgba(0,0,0,.4);
-      "></div>
+        display:flex;
+        align-items:center;
+        justify-content:center;
+      ">
+        <span style="font-family:'Material Icons';font-size:14px;color:white;line-height:1;transform:rotate(45deg);">${iconName}</span>
+      </div>
     </div>`,
-    iconSize: [16, 22],
-    iconAnchor: [8, 22],
-    popupAnchor: [0, -24],
+    iconSize: [pinW, pinH],
+    iconAnchor: [pinW / 2, pinH],
+    popupAnchor: [0, -pinH],
   });
 }
 

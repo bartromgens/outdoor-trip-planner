@@ -29,7 +29,7 @@ const WAYPOINT_COLORS: Record<WaypointRole, string> = {
 function waypointIcon(role: WaypointRole): L.DivIcon {
   return circleMarkerIcon({
     color: WAYPOINT_COLORS[role],
-    size: 14,
+    size: 22,
     shadow: '0 2px 4px rgba(0,0,0,.45)',
     border: '2.5px solid #fff',
     popupAnchor: [0, -12],

@@ -4,6 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MAT_DIALOG_DATA, MatDialogModule, MatDialogRef } from '@angular/material/dialog';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSelectModule } from '@angular/material/select';
 import { LOCATION_CATEGORIES } from './location-categories';
 
@@ -31,6 +32,7 @@ export interface AddLocationDialogResult {
     MatDialogModule,
     ReactiveFormsModule,
     MatFormFieldModule,
+    MatIconModule,
     MatInputModule,
     MatSelectModule,
     MatButtonModule,
@@ -54,7 +56,10 @@ export interface AddLocationDialogResult {
           <mat-label>Category</mat-label>
           <mat-select formControlName="category">
             @for (cat of categories; track cat.value) {
-              <mat-option [value]="cat.value">{{ cat.label }}</mat-option>
+              <mat-option [value]="cat.value">
+                <mat-icon class="option-icon">{{ cat.icon }}</mat-icon>
+                {{ cat.label }}
+              </mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -84,6 +89,13 @@ export interface AddLocationDialogResult {
       }
       .full-width {
         width: 100%;
+      }
+      .option-icon {
+        font-size: 20px;
+        width: 20px;
+        height: 20px;
+        margin-right: 8px;
+        vertical-align: middle;
       }
       mat-dialog-content {
         min-width: 300px;

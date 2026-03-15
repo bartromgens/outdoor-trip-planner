@@ -333,7 +333,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     };
     const popupContent = buildSaveLocationPopupContent(locationName);
     this.searchResultMarker = L.marker(latlng, {
-      icon: circleMarkerIcon({ color: '#1976d2', size: 14 }),
+      icon: circleMarkerIcon({ color: '#1976d2', size: 22 }),
     })
       .bindPopup(popupContent, { className: 'search-result-popup' })
       .addTo(this.map);
