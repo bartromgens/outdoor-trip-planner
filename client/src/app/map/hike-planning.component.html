@@ -3,3 +3,15 @@
     <span class="map-loading-overlay__text">Loading hike route&hellip;</span>
   </div>
 }
+@if (hikePlanningActive() && routeStats(); as stats) {
+  <div class="hike-stats-panel">
+    <span class="hike-stats-panel__distance">{{ stats.distance_km | number:'1.1-1' }} km</span>
+    <span class="hike-stats-panel__duration">{{ formatDuration(stats.duration_s) }}</span>
+    @if (stats.ascent_m != null && stats.descent_m != null) {
+      <span class="hike-stats-panel__elev">&#8593; {{ stats.ascent_m }} m &nbsp; &#8595; {{ stats.descent_m }} m</span>
+    }
+    @if (stats.elevation_range_m != null) {
+      <span class="hike-stats-panel__range" title="Altitude range (highest − lowest)">&#8597; {{ stats.elevation_range_m }} m</span>
+    }
+  </div>
+}

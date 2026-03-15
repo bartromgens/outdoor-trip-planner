@@ -3,3 +3,31 @@
 :host {
   display: contents;
 }
+
+.hike-stats-panel {
+  position: absolute;
+  bottom: calc(max(20vh, 300px) + 12px);
+  left: 12px;
+  z-index: 1001;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  align-items: center;
+  justify-content: flex-start;
+  background: rgba(0, 0, 0, 0.7);
+  color: #fff;
+  border-radius: 8px;
+  padding: 10px 16px;
+  pointer-events: none;
+  font-size: 13px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  &__distance {
+    font-weight: 600;
+  }
+
+  &__elev,
+  &__range {
+    opacity: 0.95;
+  }
+}

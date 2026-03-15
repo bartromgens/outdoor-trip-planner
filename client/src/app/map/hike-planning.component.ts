@@ -7,9 +7,11 @@ import {
   NgZone,
   ChangeDetectorRef,
   OnDestroy,
+  signal,
 } from '@angular/core';
 import * as L from 'leaflet';
 import type * as GeoJSON from 'geojson';
+import { DecimalPipe } from '@angular/common';
 import { MatDialog } from '@angular/material/dialog';
 import { TransportService, type HikeDirectionsResult } from '../services/transport.service';
 import { HikeRouteService, type SavedHikeRoute } from '../services/hike-route.service';
@@ -49,10 +51,35 @@ function formatElevationStats(
   return `<br><span style="font-size:12px">&#8593; ${ascentM} m &nbsp; &#8595; ${descentM} m</span>`;
 }
 
+function elevationRangeFromProfile(
+  profile: [number, number][] | null | undefined,
+): number | null {
+  if (!profile?.length) return null;
+  const elevations = profile.map((p) => p[1]);
+  const min = Math.min(...elevations);
+  const max = Math.max(...elevations);
+  return Math.round(max - min);
+}
+
+function formatElevationRange(profile: [number, number][] | null | undefined): string {
+  const range = elevationRangeFromProfile(profile);
+  if (range == null) return '';
+  return `<br><span style="font-size:12px">&#8597; ${range} m (highest − lowest)</span>`;
+}
+
+export interface HikeRouteStats {
+  distance_km: number;
+  duration_s: number;
+  ascent_m: number | null;
+  descent_m: number | null;
+  elevation_range_m: number | null;
+}
+
 @Component({
   selector: 'app-hike-planning',
   templateUrl: './hike-planning.component.html',
   styleUrl: './hike-planning.component.scss',
+  imports: [DecimalPipe],
 })
 export class HikePlanningComponent implements OnDestroy {
   private transportService = inject(TransportService);
@@ -77,6 +104,7 @@ export class HikePlanningComponent implements OnDestroy {
 
   hikeLoading = false;
   editingRouteId: number | null = null;
+  readonly routeStats = signal<HikeRouteStats | null>(null);
 
   constructor() {
     effect(() => {
@@ -86,6 +114,10 @@ export class HikePlanningComponent implements OnDestroy {
 
   get hikeRouteLayer(): L.GeoJSON | undefined {
     return this._hikeRouteLayer;
+  }
+
+  formatDuration(seconds: number): string {
+    return formatRouteDuration(seconds);
   }
 
   init(map: L.Map, layerControl: L.Control.Layers): void {
@@ -111,6 +143,7 @@ export class HikePlanningComponent implements OnDestroy {
     this.hikeLoading = false;
     this.editingRouteId = null;
     this.lastHikeDirectionsResult = null;
+    this.routeStats.set(null);
     this.elevationProfile.emit(null);
   }
 
@@ -189,18 +222,19 @@ export class HikePlanningComponent implements OnDestroy {
           properties: {},
         };
         const layer = L.geoJSON(geojson, {
-          style: { color: '#1565c0', weight: 3, opacity: 0.75 },
+          style: { color: '#1565c0', weight: 5, opacity: 0.75 },
         });
 
         const distKm = route.distance_m != null ? (route.distance_m / 1000).toFixed(1) : '?';
         const dur = route.duration_s != null ? formatRouteDuration(route.duration_s) : '?';
         const statsRow = formatElevationStats(route.ascent_m, route.descent_m);
+        const rangeRow = formatElevationRange(route.elevation_profile);
         const popupId = `hike-popup-${route.id}`;
         layer.bindPopup(
           `<div id="${popupId}">
             <b>${route.name}</b><br>
             <span style="font-size:12px">${distKm} km &mdash; ${dur}</span>
-            ${statsRow}
+            ${statsRow}${rangeRow}
             <div class="hike-popup-actions">
               <button class="hike-edit-btn" data-id="${route.id}" type="button">Edit</button>
               <button class="hike-delete-btn" data-id="${route.id}" type="button">Delete</button>
@@ -350,10 +384,11 @@ export class HikePlanningComponent implements OnDestroy {
         const distKm = (summary['distance'] / 1000).toFixed(1);
         const dur = formatRouteDuration(summary['duration']);
         const statsRow = formatElevationStats(summary['ascent_m'], summary['descent_m']);
+        const rangeRow = formatElevationRange(summary['elevation_profile']);
         layer.bindPopup(
           `<b>Hike route</b><br>
           <span style="font-size:12px">${distKm} km &mdash; ${dur}</span>
-          ${statsRow}`,
+          ${statsRow}${rangeRow}`,
         );
       },
     }).addTo(this.map);
@@ -363,6 +398,19 @@ export class HikePlanningComponent implements OnDestroy {
     }
     const profile = result.features[0]?.properties?.summary?.elevation_profile;
     this.elevationProfile.emit(profile ?? null);
+
+    const summary = result.features[0]?.properties?.summary;
+    if (summary) {
+      this.routeStats.set({
+        distance_km: summary['distance'] / 1000,
+        duration_s: summary['duration'],
+        ascent_m: summary['ascent_m'] ?? null,
+        descent_m: summary['descent_m'] ?? null,
+        elevation_range_m: elevationRangeFromProfile(profile),
+      });
+    } else {
+      this.routeStats.set(null);
+    }
   }
 
   private async persistHikeRoute(name: string, isUpdate: boolean): Promise<void> {
