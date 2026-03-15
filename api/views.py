@@ -359,6 +359,11 @@ def _routing_backend() -> str:
     return getattr(settings, "ROUTING_BACKEND", "ors").lower()
 
 
+@api_view(["GET"])
+def config(_request: Request) -> Response:
+    return Response({"routingBackend": _routing_backend()})
+
+
 def _routing_api_key() -> str:
     backend = _routing_backend()
     if backend == "valhalla":

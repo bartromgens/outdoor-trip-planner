@@ -103,6 +103,7 @@ export class MapReachabilityComponent {
   private reachabilityLayer?: L.LayerGroup;
   private isochroneLayer?: L.LayerGroup;
   private currentReachabilityFeatures: GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>[] = [];
+  routingBackend: string | null = null;
 
   reachabilityLoading = false;
 
@@ -128,6 +129,10 @@ export class MapReachabilityComponent {
     this.map = map;
     this.layerControl = layerControl;
     this.map.on('contextmenu', (e: L.LeafletMouseEvent) => this.onMapRightClick(e));
+    this.transportService.getConfig().then((c) => {
+      this.routingBackend = c.routingBackend;
+      this.cdr.detectChanges();
+    });
   }
 
   clearHikingRanges(): void {
@@ -183,9 +188,7 @@ export class MapReachabilityComponent {
             <button class="isochrone-trigger-btn" type="button">
               Show 1/2/3 h hiking range
             </button>
-            <div style="font-size:10px;opacity:.6;margin-top:4px;line-height:1.3">
-              Approximate — elevation not modelled
-            </div>
+            ${this.routingBackend === 'ors' ? '<div style="font-size:10px;opacity:.6;margin-top:4px;line-height:1.3">Approximate — elevation not modelled</div>' : ''}
           </div>
         </div>`,
       )
@@ -276,10 +279,11 @@ export class MapReachabilityComponent {
           fillOpacity: cfg.fillOpacity,
         },
       });
-      layer.bindPopup(
-        `<b>Hiking range: ${cfg.label}</b>` +
-          `<div style="font-size:11px;opacity:.65;margin-top:4px;max-width:180px;line-height:1.3">${ISOCHRONE_DISCLAIMER}</div>`,
-      );
+      const disclaimerHtml =
+        this.routingBackend === 'ors'
+          ? `<div style="font-size:11px;opacity:.65;margin-top:4px;max-width:180px;line-height:1.3">${ISOCHRONE_DISCLAIMER}</div>`
+          : '';
+      layer.bindPopup(`<b>Hiking range: ${cfg.label}</b>${disclaimerHtml}`);
       return layer;
     });
 

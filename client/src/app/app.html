@@ -7,11 +7,19 @@
 </mat-toolbar>
 
 <mat-sidenav-container class="sidenav-container">
-  <mat-sidenav mode="side" opened>
+  <mat-sidenav #sidenav mode="side" opened>
     <app-chat />
   </mat-sidenav>
 
   <mat-sidenav-content>
+    <button
+      class="sidebar-toggle"
+      type="button"
+      (click)="toggleSidebar()"
+      [attr.aria-label]="sidenav.opened ? 'Close sidebar' : 'Open sidebar'"
+    >
+      <mat-icon>{{ sidenav.opened ? 'chevron_left' : 'chevron_right' }}</mat-icon>
+    </button>
     <router-outlet />
   </mat-sidenav-content>
 </mat-sidenav-container>

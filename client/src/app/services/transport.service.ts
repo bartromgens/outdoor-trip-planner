@@ -57,8 +57,18 @@ function bucket(durationMin: number): 15 | 30 | 45 | 60 {
   return 60;
 }
 
+export interface AppConfig {
+  routingBackend: string;
+}
+
 @Injectable({ providedIn: 'root' })
 export class TransportService {
+  async getConfig(): Promise<AppConfig> {
+    const resp = await fetch('/api/config/');
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json() as Promise<AppConfig>;
+  }
+
   async getReachability(
     lat: number,
     lon: number,

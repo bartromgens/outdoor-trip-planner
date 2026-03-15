@@ -1,7 +1,8 @@
-import { Component, signal } from '@angular/core';
+import { Component, signal, viewChild } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
+import { MatIconModule } from '@angular/material/icon';
 import { ChatComponent } from './chat/chat.component';
 import { DepartureDatetimePickerComponent } from './departure-datetime-picker/departure-datetime-picker.component';
 import { MapSelectorComponent } from './map-selector/map-selector.component';
@@ -13,6 +14,7 @@ import { LocationSearchComponent } from './location-search/location-search.compo
     RouterOutlet,
     MatToolbarModule,
     MatSidenavModule,
+    MatIconModule,
     LocationSearchComponent,
     ChatComponent,
     DepartureDatetimePickerComponent,
@@ -23,4 +25,9 @@ import { LocationSearchComponent } from './location-search/location-search.compo
 })
 export class App {
   protected readonly title = signal('Outdoor Trip Planner');
+  private readonly sidenav = viewChild(MatSidenav);
+
+  protected toggleSidebar(): void {
+    this.sidenav()?.toggle();
+  }
 }
