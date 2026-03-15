@@ -12,7 +12,7 @@ export const LOCATION_CATEGORIES: LocationCategory[] = [
   { value: 'hut', label: 'Hut', color: '#bf360c' },
   { value: 'parking', label: 'Parking', color: '#37474f' },
   { value: 'peak', label: 'Peak', color: '#4a148c' },
-  { value: 'supermarket', label: 'Supermarket', color: '#2e7d32' },
+  { value: 'supermarket', label: 'Supermarket', color: '#f9a825' },
   { value: 'train-station', label: 'Train Station', color: '#0d47a1' },
   { value: 'trail', label: 'Trail', color: '#e65100' },
   { value: 'village', label: 'Village', color: '#1976d2' },
