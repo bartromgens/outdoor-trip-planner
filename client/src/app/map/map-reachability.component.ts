@@ -118,6 +118,7 @@ export class MapReachabilityComponent {
   isochroneLoading = false;
   rangeLoading = false;
   readonly hasHikingRanges = signal(false);
+  readonly rangeError = signal(false);
 
   get reachabilityLoadingText(): string {
     return this.tripDateTime.departureTime()
@@ -147,6 +148,7 @@ export class MapReachabilityComponent {
 
   async loadRangesForLocation(mapUuid: string, locationId: number): Promise<void> {
     this.rangeLoading = true;
+    this.rangeError.set(false);
     this.cdr.detectChanges();
     const time = this.tripDateTime.departureTime()?.toISOString();
     try {
@@ -158,6 +160,7 @@ export class MapReachabilityComponent {
       this.renderReachabilityLayer(reachabilityResult.features);
     } catch (e) {
       console.error('Failed to load saved location range data', e);
+      this.rangeError.set(true);
     } finally {
       this.deferDetectChanges(() => {
         this.rangeLoading = false;

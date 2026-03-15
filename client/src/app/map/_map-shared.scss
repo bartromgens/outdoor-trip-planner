@@ -10,6 +10,10 @@
   padding: 6px 16px;
   pointer-events: none;
 
+  &--error {
+    background: rgba(180, 30, 30, 0.85);
+  }
+
   &__text {
     font-size: 13px;
     font-weight: 500;

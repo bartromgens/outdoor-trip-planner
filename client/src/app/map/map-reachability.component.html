@@ -13,3 +13,8 @@
     <span class="map-loading-overlay__text">Loading range &amp; transit&hellip;</span>
   </div>
 }
+@if (rangeError()) {
+  <div class="map-loading-overlay map-loading-overlay--error">
+    <span class="map-loading-overlay__text">Failed to load range data &mdash; routing service unavailable</span>
+  </div>
+}

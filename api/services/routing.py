@@ -86,6 +86,8 @@ def isochrone_ors(lat: float, lon: float, api_key: str) -> dict[str, Any]:
         },
         timeout=TIMEOUT,
     )
+    if not resp.is_success:
+        logger.error("ORS isochrone error %s: %s", resp.status_code, resp.text[:500])
     resp.raise_for_status()
     return resp.json()
 
