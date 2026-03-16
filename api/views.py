@@ -1,10 +1,14 @@
 import json
 import logging
+import threading
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
+
+from django.db import OperationalError
 
 import httpx
 from django.http import FileResponse, HttpRequest, HttpResponse, StreamingHttpResponse
@@ -259,6 +263,7 @@ DEFAULT_REACHABILITY_DATETIME = datetime(2026, 6, 23, 7, 0, 0, tzinfo=timezone.U
 REACHABILITY_WINDOW_MINUTES = 120
 REACHABILITY_INTERVAL_MINUTES = 10
 REACHABILITY_NUM_SLOTS = REACHABILITY_WINDOW_MINUTES // REACHABILITY_INTERVAL_MINUTES  # 12
+REACHABILITY_MAX_PARALLEL = 3
 
 REACHABILITY_ISOCHRONE_EXCLUDED_CATEGORIES = frozenset(
     {"supermarket", "water", "viewpoint", "trail", "peak", "parking", "hut", "campsite"}
@@ -396,6 +401,12 @@ def _round_coord(v: float) -> float:
     return round(v, 6)
 
 
+_REACHABILITY_CACHE_WRITE_LOCK = threading.Lock()
+
+_MAX_CACHE_WRITE_RETRIES = 3
+_CACHE_WRITE_RETRY_SLEEP_S = 0.05
+
+
 def _get_cached_slot(
     lat: float, lon: float, slot_dt: datetime
 ) -> dict[str, Any] | None:
@@ -406,12 +417,35 @@ def _get_cached_slot(
 
 
 def _store_cached_slot(lat: float, lon: float, slot_dt: datetime, data: dict[str, Any]) -> None:
-    ReachabilityCache.objects.update_or_create(
-        latitude=lat,
-        longitude=lon,
-        query_datetime=slot_dt,
-        defaults={"data": data},
-    )
+    for attempt in range(_MAX_CACHE_WRITE_RETRIES):
+        with _REACHABILITY_CACHE_WRITE_LOCK:
+            try:
+                ReachabilityCache.objects.update_or_create(
+                    latitude=lat,
+                    longitude=lon,
+                    query_datetime=slot_dt,
+                    defaults={"data": data},
+                )
+                return
+            except OperationalError as e:
+                if "locked" not in str(e).lower() or attempt == _MAX_CACHE_WRITE_RETRIES - 1:
+                    raise
+        time.sleep(_CACHE_WRITE_RETRY_SLEEP_S * (attempt + 1))
+
+
+def _fetch_and_cache_slot(
+    lat: float,
+    lon: float,
+    slot_dt: datetime,
+    max_travel_time: int,
+) -> tuple[dict[str, Any], datetime] | None:
+    try:
+        data, _ = _fetch_reachability(lat, lon, slot_dt.isoformat(), max_travel_time)
+        _store_cached_slot(lat, lon, slot_dt, data)
+        return (data, slot_dt)
+    except Exception:
+        logger.warning("Reachability slot %s failed", slot_dt.isoformat(), exc_info=True)
+        return None
 
 
 def _fetch_optimal_reachability(
@@ -439,13 +473,15 @@ def _fetch_optimal_reachability(
     results: list[tuple[dict[str, Any], datetime]] = [
         (data, slot_dt) for slot_dt, data in cached.items()
     ]
-    for slot_dt in missing:
-        try:
-            data, _ = _fetch_reachability(lat, lon, slot_dt.isoformat(), max_travel_time)
-            _store_cached_slot(lat, lon, slot_dt, data)
-            results.append((data, slot_dt))
-        except Exception:
-            logger.warning("Reachability slot %s failed", slot_dt.isoformat(), exc_info=True)
+    with ThreadPoolExecutor(max_workers=REACHABILITY_MAX_PARALLEL) as executor:
+        futures = {
+            executor.submit(_fetch_and_cache_slot, lat, lon, slot_dt, max_travel_time): slot_dt
+            for slot_dt in missing
+        }
+        for future in as_completed(futures):
+            pair = future.result()
+            if pair is not None:
+                results.append(pair)
 
     if not results:
         raise RuntimeError("All reachability slots failed")
