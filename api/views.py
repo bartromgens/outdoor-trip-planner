@@ -1,5 +1,6 @@
 import json
 import logging
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -80,10 +81,18 @@ def geocode_search(request: Request) -> Response:
         return Response({"results": []})
 
     try:
+        t0 = time.perf_counter()
         resp = httpx.get(
             f"{STADIA_GEOCODING_BASE}/search",
             params={"text": q, "api_key": api_key, "size": 10},
             timeout=10.0,
+        )
+        elapsed = time.perf_counter() - t0
+        logger.info(
+            "GEOCODE_API_REQUEST backend=stadia q=%r status=%s %.2fs",
+            q,
+            resp.status_code,
+            elapsed,
         )
         resp.raise_for_status()
         data = resp.json()
@@ -247,9 +256,9 @@ def contour(request: Request, elevation: int) -> Response:
 
 DEFAULT_REACHABILITY_DATETIME = datetime(2026, 6, 23, 7, 0, 0, tzinfo=timezone.UTC)
 
-REACHABILITY_WINDOW_MINUTES = 90
+REACHABILITY_WINDOW_MINUTES = 120
 REACHABILITY_INTERVAL_MINUTES = 10
-REACHABILITY_NUM_SLOTS = REACHABILITY_WINDOW_MINUTES // REACHABILITY_INTERVAL_MINUTES
+REACHABILITY_NUM_SLOTS = REACHABILITY_WINDOW_MINUTES // REACHABILITY_INTERVAL_MINUTES  # 12
 
 REACHABILITY_ISOCHRONE_EXCLUDED_CATEGORIES = frozenset(
     {"supermarket", "water", "viewpoint", "trail", "peak", "parking", "hut", "campsite"}
@@ -291,11 +300,20 @@ def _fetch_reachability(
         "maxTransfers": 3,
         "time": query_datetime.isoformat(),
     }
+    t0 = time.perf_counter()
     resp = httpx.get(
         f"{TRANSITOUS_BASE}/api/v1/one-to-all",
         params=params,
         headers=HEADERS,
         timeout=TIMEOUT,
+    )
+    elapsed = time.perf_counter() - t0
+    logger.info(
+        "TRANSIT_API_REQUEST endpoint=one-to-all lat=%s lon=%s status=%s %.2fs",
+        lat,
+        lon,
+        resp.status_code,
+        elapsed,
     )
     resp.raise_for_status()
     data = resp.json()
@@ -441,6 +459,7 @@ def reachability(request: Request) -> Response:
     lat_str = request.query_params.get("lat", "")
     lon_str = request.query_params.get("lon", "")
     time_str = request.query_params.get("time", "")
+    optimal = request.query_params.get("optimal", "").lower() in ("1", "true", "yes")
     try:
         max_travel_time = int(request.query_params.get("max_travel_time", 60))
     except (ValueError, TypeError):
@@ -457,7 +476,11 @@ def reachability(request: Request) -> Response:
             {"error": "lat and lon must be numeric"}, status=status.HTTP_400_BAD_REQUEST
         )
     try:
-        data, _ = _fetch_reachability(lat, lon, time_str, max_travel_time)
+        if optimal and time_str:
+            query_dt = _parse_query_datetime(time_str)
+            data, _ = _fetch_optimal_reachability(lat, lon, query_dt, max_travel_time)
+        else:
+            data, _ = _fetch_reachability(lat, lon, time_str, max_travel_time)
         return Response(data)
     except Exception:
         logger.exception("Reachability API error")

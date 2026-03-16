@@ -49,21 +49,6 @@ export interface ReachabilityResult {
   query_datetime?: string;
 }
 
-const WINDOW_MINUTES = 90;
-const INTERVAL_MINUTES = 10;
-const NUM_SLOTS = WINDOW_MINUTES / INTERVAL_MINUTES;
-const SLOT_INTERVAL_MS = INTERVAL_MINUTES * 60 * 1000;
-
-function toIsoUtc(d: Date): string {
-  return d.toISOString().replace(/\.\d+Z$/, 'Z');
-}
-
-function bucket(durationMin: number): 15 | 30 | 45 | 60 {
-  if (durationMin <= 15) return 15;
-  if (durationMin <= 30) return 30;
-  if (durationMin <= 45) return 45;
-  return 60;
-}
 
 export interface AppConfig {
   routingBackend: string;
@@ -82,6 +67,7 @@ export class TransportService {
     lon: number,
     maxTravelTime = 60,
     time?: string,
+    optimal = false,
   ): Promise<ReachabilityResult> {
     const params = new URLSearchParams({
       lat: String(lat),
@@ -89,6 +75,7 @@ export class TransportService {
       max_travel_time: String(maxTravelTime),
     });
     if (time) params.set('time', time);
+    if (optimal) params.set('optimal', '1');
 
     const resp = await fetch(`/api/reachability/?${params}`);
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -148,49 +135,4 @@ export class TransportService {
     return result;
   }
 
-  async getReachabilityOptimal(
-    lat: number,
-    lon: number,
-    startTime: Date,
-    maxTravelTime = 60,
-  ): Promise<ReachabilityResult> {
-    const times = Array.from({ length: NUM_SLOTS }, (_, i) =>
-      toIsoUtc(new Date(startTime.getTime() + i * SLOT_INTERVAL_MS)),
-    );
-
-    const settled = await Promise.allSettled(
-      times.map((t) => this.getReachability(lat, lon, maxTravelTime, t)),
-    );
-
-    const bestMap = new Map<string, GeoJSON.Feature<GeoJSON.Point, ReachabilityStop>>();
-    let origin = { lat, lon };
-
-    for (let i = 0; i < settled.length; i++) {
-      const r = settled[i];
-      if (r.status !== 'fulfilled') continue;
-      origin = r.value.origin;
-      for (const feature of r.value.features) {
-        const [fLon, fLat] = feature.geometry.coordinates as [number, number];
-        const key = `${fLon},${fLat}`;
-        const existing = bestMap.get(key);
-        if (!existing || feature.properties.duration_min < existing.properties.duration_min) {
-          const dMin = feature.properties.duration_min;
-          bestMap.set(key, {
-            ...feature,
-            properties: {
-              ...feature.properties,
-              bucket: bucket(dMin),
-              best_time: times[i],
-            },
-          });
-        }
-      }
-    }
-
-    return {
-      type: 'FeatureCollection',
-      origin,
-      features: Array.from(bestMap.values()),
-    };
-  }
 }

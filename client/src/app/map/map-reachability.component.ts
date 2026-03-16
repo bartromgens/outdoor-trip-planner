@@ -284,9 +284,13 @@ export class MapReachabilityComponent {
     this.cdr.detectChanges();
     try {
       const departureTime = this.tripDateTime.departureTime();
-      const result = departureTime
-        ? await this.transportService.getReachabilityOptimal(lat, lng, departureTime)
-        : await this.transportService.getReachability(lat, lng);
+      const result = await this.transportService.getReachability(
+        lat,
+        lng,
+        60,
+        departureTime ? departureTime.toISOString().replace(/\.\d+Z$/, 'Z') : undefined,
+        !!departureTime,
+      );
       this.renderReachabilityLayer(result.features, true);
     } catch {
       console.error('Failed to load reachability data');

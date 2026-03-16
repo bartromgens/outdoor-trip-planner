@@ -9,7 +9,7 @@ export interface LocationCategory {
 }
 
 export const LOCATION_CATEGORIES: LocationCategory[] = [
-  { value: '', label: '— none —', color: '#1976d2', icon: 'place', showReachabilityIsochrones: false },
+  { value: '', label: '— none —', color: '#1976d2', icon: 'place', showReachabilityIsochrones: true },
   { value: 'apartment', label: 'Apartment', color: '#ec407a', icon: 'hotel', showReachabilityIsochrones: true },
   { value: 'bus-stop', label: 'Bus Stop', color: '#1565c0', icon: 'directions_bus', showReachabilityIsochrones: true },
   { value: 'campsite', label: 'Campsite', color: '#33691e', icon: 'camping', showReachabilityIsochrones: false },
