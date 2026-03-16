@@ -4,8 +4,8 @@ from .models import (
     HikeRoute,
     Location,
     LocationIsochroneCache,
-    LocationReachabilityCache,
     Map,
+    ReachabilityCache,
 )
 
 
@@ -63,9 +63,8 @@ class LocationIsochroneCacheAdmin(admin.ModelAdmin):
     raw_id_fields = ["location"]
 
 
-@admin.register(LocationReachabilityCache)
-class LocationReachabilityCacheAdmin(admin.ModelAdmin):
-    list_display = ["location", "query_datetime"]
+@admin.register(ReachabilityCache)
+class ReachabilityCacheAdmin(admin.ModelAdmin):
+    list_display = ["latitude", "longitude", "query_datetime", "created_at"]
     list_filter = ["query_datetime"]
-    readonly_fields = ["location", "data", "query_datetime"]
-    raw_id_fields = ["location"]
+    readonly_fields = ["latitude", "longitude", "query_datetime", "data", "created_at"]

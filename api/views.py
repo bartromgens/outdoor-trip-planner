@@ -1,6 +1,5 @@
 import json
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -22,8 +21,8 @@ from .models import (
     HikeRoute,
     Location,
     LocationIsochroneCache,
-    LocationReachabilityCache,
     Map,
+    ReachabilityCache,
 )
 from .serializers import HikeRouteSerializer, LocationSerializer, MapSerializer
 from .services.agent import run_agent, stream_agent_events
@@ -375,30 +374,60 @@ def _merge_optimal_reachability(
     )
 
 
+def _round_coord(v: float) -> float:
+    return round(v, 6)
+
+
+def _get_cached_slot(
+    lat: float, lon: float, slot_dt: datetime
+) -> dict[str, Any] | None:
+    entry = ReachabilityCache.objects.filter(
+        latitude=lat, longitude=lon, query_datetime=slot_dt
+    ).first()
+    return entry.data if entry is not None else None
+
+
+def _store_cached_slot(lat: float, lon: float, slot_dt: datetime, data: dict[str, Any]) -> None:
+    ReachabilityCache.objects.update_or_create(
+        latitude=lat,
+        longitude=lon,
+        query_datetime=slot_dt,
+        defaults={"data": data},
+    )
+
+
 def _fetch_optimal_reachability(
     lat: float,
     lon: float,
     window_start: datetime,
     max_travel_time: int = 60,
 ) -> tuple[dict[str, Any], datetime]:
-    """Fetch and merge reachability across NUM_SLOTS time slots in parallel."""
+    lat = _round_coord(lat)
+    lon = _round_coord(lon)
     slot_times = [
         window_start + timedelta(minutes=i * REACHABILITY_INTERVAL_MINUTES)
         for i in range(REACHABILITY_NUM_SLOTS)
     ]
 
-    def fetch_slot(slot_dt: datetime) -> tuple[dict[str, Any], datetime]:
-        data, _ = _fetch_reachability(lat, lon, slot_dt.isoformat(), max_travel_time)
-        return data, slot_dt
+    cached: dict[datetime, dict[str, Any]] = {}
+    missing: list[datetime] = []
+    for slot_dt in slot_times:
+        hit = _get_cached_slot(lat, lon, slot_dt)
+        if hit is not None:
+            cached[slot_dt] = hit
+        else:
+            missing.append(slot_dt)
 
-    results: list[tuple[dict[str, Any], datetime]] = []
-    with ThreadPoolExecutor(max_workers=REACHABILITY_NUM_SLOTS) as executor:
-        futures = {executor.submit(fetch_slot, t): t for t in slot_times}
-        for future in as_completed(futures):
-            try:
-                results.append(future.result())
-            except Exception:
-                logger.warning("Reachability slot %s failed", futures[future].isoformat())
+    results: list[tuple[dict[str, Any], datetime]] = [
+        (data, slot_dt) for slot_dt, data in cached.items()
+    ]
+    for slot_dt in missing:
+        try:
+            data, _ = _fetch_reachability(lat, lon, slot_dt.isoformat(), max_travel_time)
+            _store_cached_slot(lat, lon, slot_dt, data)
+            results.append((data, slot_dt))
+        except Exception:
+            logger.warning("Reachability slot %s failed", slot_dt.isoformat(), exc_info=True)
 
     if not results:
         raise RuntimeError("All reachability slots failed")
@@ -700,43 +729,23 @@ def location_reachability(request: Request, uuid: UUID, pk: int) -> Response:
         )
     time_str = request.query_params.get("time", "")
     optimal = request.query_params.get("optimal", "").lower() in ("1", "true", "yes")
-    lat, lon = loc.latitude, loc.longitude
+    lat = _round_coord(loc.latitude)
+    lon = _round_coord(loc.longitude)
     query_dt = _parse_query_datetime(time_str or None)
 
     if optimal and time_str:
-        window_start = query_dt
-        cache = LocationReachabilityCache.objects.filter(
-            location=loc, query_datetime=window_start
-        ).first()
-        if cache is not None:
-            out = {
-                **cache.data,
-                "query_datetime": cache.query_datetime.isoformat(),
-            }
-            return Response(out)
         try:
-            data, query_dt = _fetch_optimal_reachability(lat, lon, window_start)
+            data, query_dt = _fetch_optimal_reachability(lat, lon, query_dt)
         except Exception:
             logger.exception("Reachability API error")
             return Response(
                 {"error": "Failed to fetch reachability data"},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
-        LocationReachabilityCache.objects.update_or_create(
-            location=loc,
-            query_datetime=window_start,
-            defaults={"data": data},
-        )
     else:
-        cache = LocationReachabilityCache.objects.filter(
-            location=loc, query_datetime=query_dt
-        ).first()
-        if cache is not None:
-            out = {
-                **cache.data,
-                "query_datetime": cache.query_datetime.isoformat(),
-            }
-            return Response(out)
+        cached_data = _get_cached_slot(lat, lon, query_dt)
+        if cached_data is not None:
+            return Response({**cached_data, "query_datetime": query_dt.isoformat()})
         try:
             data, query_dt = _fetch_reachability(lat, lon, time_str or None, 60)
         except Exception:
@@ -745,13 +754,8 @@ def location_reachability(request: Request, uuid: UUID, pk: int) -> Response:
                 {"error": "Failed to fetch reachability data"},
                 status=status.HTTP_502_BAD_GATEWAY,
             )
-        LocationReachabilityCache.objects.update_or_create(
-            location=loc,
-            query_datetime=query_dt,
-            defaults={"data": data},
-        )
-    out = {**data, "query_datetime": query_dt.isoformat()}
-    return Response(out)
+        _store_cached_slot(lat, lon, query_dt, data)
+    return Response({**data, "query_datetime": query_dt.isoformat()})
 
 
 @api_view(["GET", "POST"])

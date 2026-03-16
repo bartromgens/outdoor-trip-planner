@@ -29,7 +29,7 @@ def geocode_location(text: str) -> str:
     )
     elapsed = time.perf_counter() - t0
     resp.raise_for_status()
-    logger.debug("Geocode HTTP %s  %.2fs", resp.status_code, elapsed)
+    logger.info("Geocode HTTP %s  %s  %.2fs", resp.status_code, resp.url, elapsed)
 
     matches = resp.json()
     results = []
@@ -85,7 +85,7 @@ def plan_transit_route(
     )
     elapsed = time.perf_counter() - t0
     resp.raise_for_status()
-    logger.debug("Transit HTTP %s  %.2fs", resp.status_code, elapsed)
+    logger.info("Transit HTTP %s  %s  %.2fs", resp.status_code, resp.url, elapsed)
 
     data = resp.json()
 
@@ -149,7 +149,7 @@ def get_stoptimes(
     )
     elapsed = time.perf_counter() - t0
     resp.raise_for_status()
-    logger.debug("Stop times HTTP %s  %.2fs", resp.status_code, elapsed)
+    logger.info("Stop times HTTP %s  %s  %.2fs", resp.status_code, resp.url, elapsed)
 
     data = resp.json()
 
