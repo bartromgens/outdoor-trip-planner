@@ -223,7 +223,7 @@ export class MapReachabilityComponent {
 
   get reachabilityLoadingText(): string {
     return this.tripDateTime.departureTime()
-      ? 'Optimizing reachability (9 slots)\u2026'
+      ? 'Optimizing reachability\u2026'
       : 'Loading reachability\u2026';
   }
 

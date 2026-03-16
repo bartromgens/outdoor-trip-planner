@@ -1,17 +1,3 @@
-<mat-toolbar class="toolbar-white">
-  <span>{{ title() }}</span>
-  <span class="toolbar-spacer"></span>
-  <div
-    class="location-search-wrapper"
-    [class.sidebar-open]="isMobile() && sidenavOpened()"
-  >
-    <app-location-search />
-  </div>
-  @if (!isMobile()) {
-    <app-departure-datetime-picker />
-  }
-</mat-toolbar>
-
 <mat-sidenav-container
   class="sidenav-container"
   [class.sidebar-open]="isMobile() && sidenavOpened()"
@@ -23,6 +9,10 @@
     (openedChange)="sidenavOpened.set($event)"
   >
     <app-map-selector />
+    <div class="sidebar-inputs">
+      <app-location-search />
+      <app-departure-datetime-picker />
+    </div>
     <app-chat />
   </mat-sidenav>
 

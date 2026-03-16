@@ -7,13 +7,12 @@ import {
 } from '@angular/core';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { RouterOutlet } from '@angular/router';
-import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatSidenavModule, MatSidenav } from '@angular/material/sidenav';
 import { MatIconModule } from '@angular/material/icon';
 import { ChatComponent } from './chat/chat.component';
-import { DepartureDatetimePickerComponent } from './departure-datetime-picker/departure-datetime-picker.component';
 import { MapSelectorComponent } from './map-selector/map-selector.component';
 import { LocationSearchComponent } from './location-search/location-search.component';
+import { DepartureDatetimePickerComponent } from './departure-datetime-picker/departure-datetime-picker.component';
 
 const MOBILE_BREAKPOINT = '(max-width: 768px)';
 
@@ -21,13 +20,12 @@ const MOBILE_BREAKPOINT = '(max-width: 768px)';
   selector: 'app-root',
   imports: [
     RouterOutlet,
-    MatToolbarModule,
     MatSidenavModule,
     MatIconModule,
-    LocationSearchComponent,
     ChatComponent,
-    DepartureDatetimePickerComponent,
     MapSelectorComponent,
+    LocationSearchComponent,
+    DepartureDatetimePickerComponent,
   ],
   templateUrl: './app.html',
   styleUrl: './app.scss',
