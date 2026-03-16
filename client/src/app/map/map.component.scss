@@ -134,6 +134,11 @@
     flex: 1;
   }
 
+  .hike-download-gpx-btn {
+    @include popup-btn(#1565c0, #0d47a1);
+    flex: 1;
+  }
+
   .hike-delete-btn {
     @include popup-btn(#c62828, #b71c1c);
     flex: 1;

@@ -12,6 +12,7 @@ export class MapControlsComponent {
   addingLocation = input<boolean>(false);
   hikePlanningActive = input<boolean>(false);
   hasHikingRanges = input<boolean>(false);
+  showDownloadGpx = input<boolean>(false);
   hikeRouteLayer = input<L.GeoJSON | undefined>(undefined);
   editingRouteId = input<number | null>(null);
   hikeLoading = input<boolean>(false);
@@ -22,4 +23,5 @@ export class MapControlsComponent {
   clearHikeRoute = output<void>();
   saveHikeRoute = output<void>();
   updateHikeRoute = output<void>();
+  downloadGpx = output<void>();
 }

@@ -16,7 +16,9 @@ import type * as GeoJSON from 'geojson';
 import { Subscription } from 'rxjs';
 import { BreakpointObserver } from '@angular/cdk/layout';
 import { MatButtonModule } from '@angular/material/button';
+import { MatDialog } from '@angular/material/dialog';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { DownloadGpxDialogComponent } from './download-gpx-dialog.component';
 import { ChatService } from '../services/chat.service';
 import { TripDateTimeService } from '../services/trip-datetime.service';
 import { MapManagerService } from '../services/map-manager.service';
@@ -30,6 +32,11 @@ import {
   handleSaveLocationClick,
   POPUP_SAVE_BTN_CLASS,
 } from './map-save-popup.helper';
+import {
+  buildContextMenuContent,
+  setupContextMenuHandlers,
+} from './map-context-menu.helper';
+import { MapContourService } from '../services/map-contour.service';
 import { MapControlsComponent } from './map-controls.component';
 import { HikePlanningComponent } from './hike-planning.component';
 import { MapReachabilityComponent } from './map-reachability.component';
@@ -37,29 +44,12 @@ import { MapSavedLocationsComponent } from './map-saved-locations.component';
 import { ElevationProfileComponent } from './elevation-profile.component';
 import { circleMarkerIcon } from './map-marker-icons';
 
-interface ContourConfig {
-  level: number;
-  label: string;
-  color: string;
-  weight: number;
-  dashArray?: string;
-}
-
-const DEFAULT_CONTOUR_LEVEL = 2000;
 const MOBILE_BREAKPOINT = '(max-width: 768px)';
 
 function searchResultLocationName(fullLabel: string): string {
   const beforeComma = fullLabel.split(',')[0];
   return beforeComma?.trim() ?? fullLabel;
 }
-
-const CONTOUR_CONFIGS: ContourConfig[] = [
-  { level: 1500, label: 'Contour 1500 m', color: '#a0522d', weight: 1.5, dashArray: '6 4' },
-  { level: 1750, label: 'Contour 1750 m', color: '#964b1a', weight: 1.8, dashArray: '7 4' },
-  { level: 2000, label: 'Contour 2000 m', color: '#8b3a0f', weight: 2, dashArray: '8 4' },
-  { level: 2500, label: 'Contour 2500 m', color: '#6b2800', weight: 2.5 },
-  { level: 3000, label: 'Contour 3000 m', color: '#4a1500', weight: 3 },
-];
 
 @Component({
   selector: 'app-map',
@@ -88,6 +78,8 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   private locationSearch = inject(LocationSearchService);
   private locationService = inject(LocationService);
   private breakpointObserver = inject(BreakpointObserver);
+  private dialog = inject(MatDialog);
+  private mapContour = inject(MapContourService);
 
   @ViewChild('hikePlanning') private hikePlanningComp!: HikePlanningComponent;
   @ViewChild('reachability') private reachabilityComp!: MapReachabilityComponent;
@@ -107,6 +99,8 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   currentMapUuid = '';
   addingLocation = false;
   hikePlanningActive = false;
+  savedHikesCount = signal(0);
+  selectedHikeId = signal<number | null>(null);
   activeElevationProfile = signal<[number, number][] | null>(null);
 
   constructor() {
@@ -187,7 +181,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     this.reachabilityComp.init(this.map, this.layerControl, () => this.activeOverlayNames);
     this.savedLocationsComp.init(this.map);
 
-    this.loadContourLayers();
+    this.mapContour.loadContourLayers(this.map, this.layerControl, this.urlOverlays, this.activeOverlayNames);
     this.mapReady = true;
 
     const pendingSearch = this.locationSearch.resultToShow();
@@ -271,88 +265,27 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     }, 300);
   }
 
-  private async loadContourLayers(): Promise<void> {
-    for (const cfg of CONTOUR_CONFIGS) {
-      try {
-        const response = await fetch(`/api/contours/${cfg.level}/`);
-        if (!response.ok) continue;
-        const geojson: GeoJSON.FeatureCollection = await response.json();
-        const layer = L.geoJSON(geojson, {
-          style: {
-            color: cfg.color,
-            weight: cfg.weight,
-            opacity: 0.8,
-            dashArray: cfg.dashArray,
-            fill: false,
-          },
-        });
-        this.layerControl.addOverlay(layer, cfg.label);
-        const shouldAdd =
-          this.urlOverlays !== null
-            ? this.urlOverlays.includes(cfg.label)
-            : cfg.level === DEFAULT_CONTOUR_LEVEL;
-        if (shouldAdd) {
-          layer.addTo(this.map);
-          this.activeOverlayNames.add(cfg.label);
-        }
-      } catch {
-        // Silently skip unavailable contour levels
-      }
-    }
-  }
-
   private onMapContextMenu(e: L.LeafletMouseEvent): void {
     if (this.addingLocation || this.hikePlanningActive) return;
     const { lat, lng } = e.latlng;
 
     const popup = L.popup({ closeButton: false, className: 'map-ctx-popup', offset: [0, -4] })
       .setLatLng(e.latlng)
-      .setContent(
-        `<div class="map-ctx-menu">
-          <button class="map-ctx-menu__item" data-action="add-location">
-            <span class="map-ctx-menu__icon material-icons">add_location_alt</span>Add location
-          </button>
-          <button class="map-ctx-menu__item" data-action="plan-hike">
-            <span class="map-ctx-menu__icon material-icons">route</span>Plan hike
-          </button>
-          <button class="map-ctx-menu__item" data-action="transit-range">
-            <span class="map-ctx-menu__icon material-icons">directions_transit</span>Show transit range
-          </button>
-          <button class="map-ctx-menu__item" data-action="hike-ranges">
-            <span class="map-ctx-menu__icon material-icons">hiking</span>Show hike ranges
-          </button>
-        </div>`,
-      )
+      .setContent(buildContextMenuContent())
       .openOn(this.map);
 
-    setTimeout(() => {
-      const el = popup.getElement();
-      if (!el) return;
-
-      el.querySelector('[data-action="add-location"]')?.addEventListener('click', () => {
-        this.map.closePopup();
-        this.ngZone.run(() => this.savedLocationsComp.addLocationAt(lat, lng));
-      });
-
-      el.querySelector('[data-action="plan-hike"]')?.addEventListener('click', () => {
-        this.map.closePopup();
+    setupContextMenuHandlers(popup, this.map, {
+      onAddLocation: () => this.ngZone.run(() => this.savedLocationsComp.addLocationAt(lat, lng)),
+      onPlanHike: () =>
         this.ngZone.run(() => {
           this.hikePlanningActive = true;
           this.cdr.detectChanges();
           this.hikePlanningComp.addWaypointAt(lat, lng);
-        });
-      });
-
-      el.querySelector('[data-action="transit-range"]')?.addEventListener('click', () => {
-        this.map.closePopup();
-        this.ngZone.run(() => this.reachabilityComp.loadReachability(lat, lng));
-      });
-
-      el.querySelector('[data-action="hike-ranges"]')?.addEventListener('click', () => {
-        this.map.closePopup();
-        this.ngZone.run(() => this.reachabilityComp.loadHikeIsochrone(lat, lng));
-      });
-    }, 0);
+        }),
+      onTransitRange: () => this.ngZone.run(() => this.reachabilityComp.loadReachability(lat, lng)),
+      onHikeRanges: () =>
+        this.ngZone.run(() => this.reachabilityComp.loadHikeIsochrone(lat, lng)),
+    });
   }
 
   onAddLocationToggle(): void {
@@ -365,6 +298,13 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onHikePlanningToggle(): void {
     this.hikePlanningActive = !this.hikePlanningActive;
+  }
+
+  openDownloadGpxDialog(): void {
+    this.dialog.open(DownloadGpxDialogComponent, {
+      data: { mapUuid: this.currentMapUuid },
+      width: '400px',
+    });
   }
 
   onHikePlanningActiveChange(value: unknown): void {

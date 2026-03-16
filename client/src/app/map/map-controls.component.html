@@ -39,4 +39,7 @@
       Update route
     </button>
   }
+  @if (showDownloadGpx()) {
+    <button mat-raised-button (click)="downloadGpx.emit()">Download GPX</button>
+  }
 </div>

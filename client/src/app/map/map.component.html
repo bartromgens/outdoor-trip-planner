@@ -15,6 +15,8 @@
   [hikePlanningActive]="hikePlanningActive"
   (hikePlanningActiveChange)="onHikePlanningActiveChange($event)"
   (elevationProfile)="activeElevationProfile.set($event)"
+  (savedHikesCountChange)="savedHikesCount.set($event)"
+  (selectedHikeIdChange)="selectedHikeId.set($event)"
 ></app-hike-planning>
 <app-elevation-profile
   [profileData]="activeElevationProfile()"
@@ -32,6 +34,7 @@
   [addingLocation]="addingLocation"
   [hikePlanningActive]="hikePlanningActive"
   [hasHikingRanges]="reachability.hasHikingRanges()"
+  [showDownloadGpx]="selectedHikeId() !== null"
   [hikeRouteLayer]="hikePlanning.hikeRouteLayer"
   [editingRouteId]="hikePlanning.editingRouteId"
   [hikeLoading]="hikePlanning.hikeLoading"
@@ -41,4 +44,5 @@
   (clearHikeRoute)="hikePlanning.clearHikeRoute()"
   (saveHikeRoute)="hikePlanning.saveHikeRoute()"
   (updateHikeRoute)="hikePlanning.updateHikeRoute()"
+  (downloadGpx)="openDownloadGpxDialog()"
 ></app-map-controls>

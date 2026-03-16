@@ -17,6 +17,7 @@ import { TransportService, type HikeDirectionsResult } from '../services/transpo
 import { HikeRouteService, type SavedHikeRoute } from '../services/hike-route.service';
 import { SaveHikeDialogComponent, type SaveHikeDialogResult } from './save-hike-dialog.component';
 import { circleMarkerIcon } from './map-marker-icons';
+import { routesToGpx, downloadGpx } from './gpx';
 
 type WaypointRole = 'start' | 'end' | 'mid';
 
@@ -92,6 +93,8 @@ export class HikePlanningComponent implements OnDestroy {
   hikePlanningActive = input<boolean>(false);
   readonly hikePlanningActiveChange = output<boolean>();
   readonly elevationProfile = output<[number, number][] | null>();
+  readonly savedHikesCountChange = output<number>();
+  readonly selectedHikeIdChange = output<number | null>();
 
   private map!: L.Map;
   private layerControl!: L.Control.Layers;
@@ -106,6 +109,7 @@ export class HikePlanningComponent implements OnDestroy {
   editingRouteId: number | null = null;
   editingRouteName: string | null = null;
   readonly routeStats = signal<HikeRouteStats | null>(null);
+  readonly savedHikeRoutes = signal<SavedHikeRoute[]>([]);
 
   constructor() {
     effect(() => {
@@ -207,11 +211,19 @@ export class HikePlanningComponent implements OnDestroy {
     this.cdr.detectChanges();
   }
 
+  downloadRouteAsGpx(route: SavedHikeRoute): void {
+    const gpx = routesToGpx([route]);
+    const filename = route.name.replace(/[<>:"/\\|?*]/g, '_').trim() || 'hike-route';
+    downloadGpx(gpx, `${filename}.gpx`);
+  }
+
   async loadSavedHikes(): Promise<void> {
     const uuid = this.mapUuid();
     if (!this.map || !this.layerControl) return;
     try {
       const routes = await this.hikeRouteService.getAll(uuid);
+      this.savedHikeRoutes.set(routes);
+      this.savedHikesCountChange.emit(routes.length);
 
       if (this.savedHikesLayer) {
         this.layerControl.removeLayer(this.savedHikesLayer);
@@ -240,20 +252,30 @@ export class HikePlanningComponent implements OnDestroy {
             ${statsRow}${rangeRow}
             <div class="hike-popup-actions">
               <button class="hike-edit-btn" data-id="${route.id}" type="button">Edit</button>
+              <button class="hike-download-gpx-btn" data-id="${route.id}" type="button">GPX</button>
               <button class="hike-delete-btn" data-id="${route.id}" type="button">Delete</button>
             </div>
           </div>`,
         );
 
         layer.on('popupopen', () => {
-          this.ngZone.run(() => this.elevationProfile.emit(route.elevation_profile ?? null));
+          this.ngZone.run(() => {
+            this.elevationProfile.emit(route.elevation_profile ?? null);
+            this.selectedHikeIdChange.emit(route.id);
+          });
           setTimeout(() => {
             const el = this.map.getContainer();
             const editBtn = el.querySelector<HTMLButtonElement>(`#${popupId} .hike-edit-btn`);
+            const downloadGpxBtn = el.querySelector<HTMLButtonElement>(
+              `#${popupId} .hike-download-gpx-btn`,
+            );
             const deleteBtn = el.querySelector<HTMLButtonElement>(`#${popupId} .hike-delete-btn`);
             editBtn?.addEventListener('click', () => {
               this.map.closePopup();
               this.ngZone.run(() => this.editSavedRoute(route));
+            });
+            downloadGpxBtn?.addEventListener('click', () => {
+              this.ngZone.run(() => this.downloadRouteAsGpx(route));
             });
             deleteBtn?.addEventListener('click', () => {
               this.map.closePopup();
@@ -263,7 +285,10 @@ export class HikePlanningComponent implements OnDestroy {
         });
 
         layer.on('popupclose', () => {
-          this.ngZone.run(() => this.elevationProfile.emit(null));
+          this.ngZone.run(() => {
+            this.elevationProfile.emit(null);
+            this.selectedHikeIdChange.emit(null);
+          });
         });
 
         return layer;

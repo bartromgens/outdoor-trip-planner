@@ -104,6 +104,8 @@ const RAIL_MODES = new Set([
   'SUBURBAN',
 ]);
 
+const LARGE_ICON_MODES = new Set([...RAIL_MODES, 'AERIAL_LIFT']);
+
 function reachabilityModeIcon(modes: string[] | undefined): string {
   const first = modes?.[0];
   return (first && MODE_ICONS[first]) || MODE_ICONS['OTHER'];
@@ -114,12 +116,17 @@ function isRailStop(modes: string[] | undefined): boolean {
   return Boolean(first && RAIL_MODES.has(first));
 }
 
+function hasLargeIcon(modes: string[] | undefined): boolean {
+  const first = modes?.[0];
+  return Boolean(first && LARGE_ICON_MODES.has(first));
+}
+
 function reachabilityIcon(durationMin: number, modes: string[] | undefined): L.DivIcon {
   const color = reachabilityColor(durationMin);
   const iconName = reachabilityModeIcon(modes);
-  const isRail = isRailStop(modes);
-  const size = isRail ? 22 : 16;
-  const iconSize = isRail ? 18 : 12;
+  const largeIcon = hasLargeIcon(modes);
+  const size = largeIcon ? 22 : 16;
+  const iconSize = largeIcon ? 18 : 12;
   return L.divIcon({
     className: 'reachability-marker',
     html: `<div style="
