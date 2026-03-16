@@ -118,8 +118,8 @@ function reachabilityIcon(durationMin: number, modes: string[] | undefined): L.D
   const color = reachabilityColor(durationMin);
   const iconName = reachabilityModeIcon(modes);
   const isRail = isRailStop(modes);
-  const size = isRail ? 24 : 18;
-  const iconSize = isRail ? 14 : 12;
+  const size = isRail ? 22 : 16;
+  const iconSize = isRail ? 18 : 12;
   return L.divIcon({
     className: 'reachability-marker',
     html: `<div style="
@@ -254,11 +254,18 @@ export class MapReachabilityComponent {
     const addReachToMap =
       !this.reachabilityLayer ||
       this.getActiveOverlayNames().has('Transit reachability');
-    const time = this.tripDateTime.departureTime()?.toISOString();
+    const departureTime = this.tripDateTime.departureTime();
+    const time = departureTime?.toISOString();
+    const optimal = Boolean(departureTime);
     try {
       const [isochroneResult, reachabilityResult] = await Promise.all([
         this.transportService.getLocationHikeIsochrone(mapUuid, locationId),
-        this.transportService.getLocationReachability(mapUuid, locationId, time),
+        this.transportService.getLocationReachability(
+          mapUuid,
+          locationId,
+          time,
+          optimal,
+        ),
       ]);
       this.renderIsochroneLayer(isochroneResult, addIsoToMap);
       this.renderReachabilityLayer(reachabilityResult.features, addReachToMap);

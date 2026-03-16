@@ -125,9 +125,11 @@ export class TransportService {
     mapUuid: string,
     locationId: number,
     time?: string,
+    optimal = false,
   ): Promise<ReachabilityResult> {
     const params = new URLSearchParams();
     if (time) params.set('time', time);
+    if (optimal) params.set('optimal', '1');
     const qs = params.toString();
     const url = `/api/maps/${mapUuid}/locations/${locationId}/reachability/${qs ? `?${qs}` : ''}`;
     const resp = await fetch(url);

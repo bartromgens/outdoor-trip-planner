@@ -1,6 +1,7 @@
 import json
 import logging
-from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -247,6 +248,10 @@ def contour(request: Request, elevation: int) -> Response:
 
 DEFAULT_REACHABILITY_DATETIME = datetime(2026, 6, 23, 7, 0, 0, tzinfo=timezone.UTC)
 
+REACHABILITY_WINDOW_MINUTES = 90
+REACHABILITY_INTERVAL_MINUTES = 10
+REACHABILITY_NUM_SLOTS = REACHABILITY_WINDOW_MINUTES // REACHABILITY_INTERVAL_MINUTES
+
 REACHABILITY_ISOCHRONE_EXCLUDED_CATEGORIES = frozenset(
     {"supermarket", "water", "viewpoint", "trail", "peak", "parking", "hut", "campsite"}
 )
@@ -260,6 +265,16 @@ def _parse_query_datetime(time_str: str | None) -> datetime:
         return datetime.fromisoformat(s)
     except ValueError:
         return DEFAULT_REACHABILITY_DATETIME
+
+
+def _bucket_duration(duration_min: int) -> int:
+    if duration_min <= 15:
+        return 15
+    if duration_min <= 30:
+        return 30
+    if duration_min <= 45:
+        return 45
+    return 60
 
 
 def _fetch_reachability(
@@ -292,14 +307,6 @@ def _fetch_reachability(
         if "lat" not in place or "lon" not in place:
             continue
         duration_min = item.get("duration", 0)
-        if duration_min <= 15:
-            bucket = 15
-        elif duration_min <= 30:
-            bucket = 30
-        elif duration_min <= 45:
-            bucket = 45
-        else:
-            bucket = 60
         features.append(
             {
                 "type": "Feature",
@@ -310,7 +317,7 @@ def _fetch_reachability(
                 "properties": {
                     "name": place.get("name", ""),
                     "duration_min": duration_min,
-                    "bucket": bucket,
+                    "bucket": _bucket_duration(duration_min),
                     "transfers": max(0, item.get("k", 1) - 1),
                     "modes": place.get("modes") or [],
                     "stop_id": place.get("stopId") or None,
@@ -331,6 +338,73 @@ def _fetch_reachability(
         },
         query_datetime,
     )
+
+
+def _merge_optimal_reachability(
+    results: list[tuple[dict[str, Any], datetime]],
+) -> tuple[dict[str, Any], datetime]:
+    """Merge reachability results across time slots, keeping best duration per stop."""
+    best_map: dict[str, dict[str, Any]] = {}
+    origin: dict[str, float] = {}
+    for data, slot_dt in results:
+        origin = data.get("origin", origin)
+        for feat in data.get("features", []):
+            coords = feat.get("geometry", {}).get("coordinates", [])
+            if len(coords) < 2:
+                continue
+            key = f"{coords[0]},{coords[1]}"
+            props = feat.get("properties", {})
+            duration_min = props.get("duration_min", 0)
+            existing = best_map.get(key)
+            if existing is None or duration_min < existing["properties"].get("duration_min", 999):
+                best_map[key] = {
+                    **feat,
+                    "properties": {
+                        **props,
+                        "bucket": _bucket_duration(duration_min),
+                        "best_time": slot_dt.isoformat(),
+                    },
+                }
+    return (
+        {
+            "type": "FeatureCollection",
+            "origin": origin,
+            "features": list(best_map.values()),
+        },
+        results[0][1],
+    )
+
+
+def _fetch_optimal_reachability(
+    lat: float,
+    lon: float,
+    window_start: datetime,
+    max_travel_time: int = 60,
+) -> tuple[dict[str, Any], datetime]:
+    """Fetch and merge reachability across NUM_SLOTS time slots in parallel."""
+    slot_times = [
+        window_start + timedelta(minutes=i * REACHABILITY_INTERVAL_MINUTES)
+        for i in range(REACHABILITY_NUM_SLOTS)
+    ]
+
+    def fetch_slot(slot_dt: datetime) -> tuple[dict[str, Any], datetime]:
+        data, _ = _fetch_reachability(lat, lon, slot_dt.isoformat(), max_travel_time)
+        return data, slot_dt
+
+    results: list[tuple[dict[str, Any], datetime]] = []
+    with ThreadPoolExecutor(max_workers=REACHABILITY_NUM_SLOTS) as executor:
+        futures = {executor.submit(fetch_slot, t): t for t in slot_times}
+        for future in as_completed(futures):
+            try:
+                results.append(future.result())
+            except Exception:
+                logger.warning("Reachability slot %s failed", futures[future].isoformat())
+
+    if not results:
+        raise RuntimeError("All reachability slots failed")
+
+    results.sort(key=lambda r: r[1])
+    return _merge_optimal_reachability(results)
 
 
 @api_view(["GET"])
@@ -625,23 +699,57 @@ def location_reachability(request: Request, uuid: UUID, pk: int) -> Response:
             status=status.HTTP_404_NOT_FOUND,
         )
     time_str = request.query_params.get("time", "")
-    cache = LocationReachabilityCache.objects.filter(location=loc).first()
-    if cache is not None:
-        out = {**cache.data, "query_datetime": cache.query_datetime.isoformat()}
-        return Response(out)
+    optimal = request.query_params.get("optimal", "").lower() in ("1", "true", "yes")
     lat, lon = loc.latitude, loc.longitude
-    try:
-        data, query_dt = _fetch_reachability(lat, lon, time_str or None, 60)
-    except Exception:
-        logger.exception("Reachability API error")
-        return Response(
-            {"error": "Failed to fetch reachability data"},
-            status=status.HTTP_502_BAD_GATEWAY,
+    query_dt = _parse_query_datetime(time_str or None)
+
+    if optimal and time_str:
+        window_start = query_dt
+        cache = LocationReachabilityCache.objects.filter(
+            location=loc, query_datetime=window_start
+        ).first()
+        if cache is not None:
+            out = {
+                **cache.data,
+                "query_datetime": cache.query_datetime.isoformat(),
+            }
+            return Response(out)
+        try:
+            data, query_dt = _fetch_optimal_reachability(lat, lon, window_start)
+        except Exception:
+            logger.exception("Reachability API error")
+            return Response(
+                {"error": "Failed to fetch reachability data"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        LocationReachabilityCache.objects.update_or_create(
+            location=loc,
+            query_datetime=window_start,
+            defaults={"data": data},
         )
-    LocationReachabilityCache.objects.update_or_create(
-        location=loc,
-        defaults={"data": data, "query_datetime": query_dt},
-    )
+    else:
+        cache = LocationReachabilityCache.objects.filter(
+            location=loc, query_datetime=query_dt
+        ).first()
+        if cache is not None:
+            out = {
+                **cache.data,
+                "query_datetime": cache.query_datetime.isoformat(),
+            }
+            return Response(out)
+        try:
+            data, query_dt = _fetch_reachability(lat, lon, time_str or None, 60)
+        except Exception:
+            logger.exception("Reachability API error")
+            return Response(
+                {"error": "Failed to fetch reachability data"},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
+        LocationReachabilityCache.objects.update_or_create(
+            location=loc,
+            query_datetime=query_dt,
+            defaults={"data": data},
+        )
     out = {**data, "query_datetime": query_dt.isoformat()}
     return Response(out)
 

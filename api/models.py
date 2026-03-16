@@ -96,12 +96,20 @@ class LocationIsochroneCache(models.Model):
 
 
 class LocationReachabilityCache(models.Model):
-    location = models.OneToOneField(
+    location = models.ForeignKey(
         Location,
         on_delete=models.CASCADE,
         related_name="reachability_cache",
     )
     data = models.JSONField(help_text="Reachability response: type, origin, features")
     query_datetime = models.DateTimeField(
-        help_text="Departure time used for the Transitous query (UTC)"
+        help_text="Departure time or window start used for the query (UTC)"
     )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["location", "query_datetime"],
+                name="unique_location_query_datetime",
+            )
+        ]
