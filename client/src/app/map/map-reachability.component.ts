@@ -93,16 +93,33 @@ const MODE_ICONS: Record<string, string> = {
   TRANSIT: 'directions_transit',
 };
 
+const RAIL_MODES = new Set([
+  'SUBWAY',
+  'RAIL',
+  'HIGHSPEED_RAIL',
+  'LONG_DISTANCE',
+  'NIGHT_RAIL',
+  'REGIONAL_FAST_RAIL',
+  'REGIONAL_RAIL',
+  'SUBURBAN',
+]);
+
 function reachabilityModeIcon(modes: string[] | undefined): string {
   const first = modes?.[0];
   return (first && MODE_ICONS[first]) || MODE_ICONS['OTHER'];
 }
 
+function isRailStop(modes: string[] | undefined): boolean {
+  const first = modes?.[0];
+  return Boolean(first && RAIL_MODES.has(first));
+}
+
 function reachabilityIcon(durationMin: number, modes: string[] | undefined): L.DivIcon {
   const color = reachabilityColor(durationMin);
   const iconName = reachabilityModeIcon(modes);
-  const size = 22;
-  const iconSize = 14;
+  const isRail = isRailStop(modes);
+  const size = isRail ? 24 : 18;
+  const iconSize = isRail ? 14 : 12;
   return L.divIcon({
     className: 'reachability-marker',
     html: `<div style="
