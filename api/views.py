@@ -3,7 +3,7 @@ import logging
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -32,7 +32,13 @@ from .models import (
 from .serializers import HikeRouteSerializer, LocationSerializer, MapSerializer
 from .services.agent import run_agent, stream_agent_events
 from .services import routing as routing_svc
-from .services.tools.transport import HEADERS, TIMEOUT, TRANSITOUS_BASE
+from .services.tools.transport import (
+    HEADERS,
+    TIMEOUT,
+    TRANSITOUS_BASE,
+    get_aerial_lift_stops,
+    probe_gondola_schedule,
+)
 from .services.tools.wikidata import find_place_info
 
 logger = logging.getLogger(__name__)
@@ -58,7 +64,9 @@ def _wikidata_extras(validated_data: dict) -> dict:
             if info:
                 if info["wikidata_id"]:
                     extra["wikidata_id"] = info["wikidata_id"]
-                if info["elevation_m"] is not None and not validated_data.get("altitude"):
+                if info["elevation_m"] is not None and not validated_data.get(
+                    "altitude"
+                ):
                     extra["altitude"] = info["elevation_m"]
         except Exception:
             logger.warning("Wikidata enrichment failed for %r", validated_data["name"])
@@ -262,7 +270,9 @@ DEFAULT_REACHABILITY_DATETIME = datetime(2026, 6, 23, 7, 0, 0, tzinfo=timezone.U
 
 REACHABILITY_WINDOW_MINUTES = 120
 REACHABILITY_INTERVAL_MINUTES = 10
-REACHABILITY_NUM_SLOTS = REACHABILITY_WINDOW_MINUTES // REACHABILITY_INTERVAL_MINUTES  # 12
+REACHABILITY_NUM_SLOTS = (
+    REACHABILITY_WINDOW_MINUTES // REACHABILITY_INTERVAL_MINUTES
+)  # 12
 REACHABILITY_MAX_PARALLEL = 3
 
 REACHABILITY_ISOCHRONE_EXCLUDED_CATEGORIES = frozenset(
@@ -378,7 +388,9 @@ def _merge_optimal_reachability(
             props = feat.get("properties", {})
             duration_min = props.get("duration_min", 0)
             existing = best_map.get(key)
-            if existing is None or duration_min < existing["properties"].get("duration_min", 999):
+            if existing is None or duration_min < existing["properties"].get(
+                "duration_min", 999
+            ):
                 best_map[key] = {
                     **feat,
                     "properties": {
@@ -416,7 +428,9 @@ def _get_cached_slot(
     return entry.data if entry is not None else None
 
 
-def _store_cached_slot(lat: float, lon: float, slot_dt: datetime, data: dict[str, Any]) -> None:
+def _store_cached_slot(
+    lat: float, lon: float, slot_dt: datetime, data: dict[str, Any]
+) -> None:
     for attempt in range(_MAX_CACHE_WRITE_RETRIES):
         with _REACHABILITY_CACHE_WRITE_LOCK:
             try:
@@ -428,7 +442,10 @@ def _store_cached_slot(lat: float, lon: float, slot_dt: datetime, data: dict[str
                 )
                 return
             except OperationalError as e:
-                if "locked" not in str(e).lower() or attempt == _MAX_CACHE_WRITE_RETRIES - 1:
+                if (
+                    "locked" not in str(e).lower()
+                    or attempt == _MAX_CACHE_WRITE_RETRIES - 1
+                ):
                     raise
         time.sleep(_CACHE_WRITE_RETRY_SLEEP_S * (attempt + 1))
 
@@ -444,7 +461,9 @@ def _fetch_and_cache_slot(
         _store_cached_slot(lat, lon, slot_dt, data)
         return (data, slot_dt)
     except Exception:
-        logger.warning("Reachability slot %s failed", slot_dt.isoformat(), exc_info=True)
+        logger.warning(
+            "Reachability slot %s failed", slot_dt.isoformat(), exc_info=True
+        )
         return None
 
 
@@ -475,7 +494,9 @@ def _fetch_optimal_reachability(
     ]
     with ThreadPoolExecutor(max_workers=REACHABILITY_MAX_PARALLEL) as executor:
         futures = {
-            executor.submit(_fetch_and_cache_slot, lat, lon, slot_dt, max_travel_time): slot_dt
+            executor.submit(
+                _fetch_and_cache_slot, lat, lon, slot_dt, max_travel_time
+            ): slot_dt
             for slot_dt in missing
         }
         for future in as_completed(futures):
@@ -524,6 +545,73 @@ def reachability(request: Request) -> Response:
             {"error": "Failed to fetch reachability data"},
             status=status.HTTP_502_BAD_GATEWAY,
         )
+
+
+@api_view(["GET"])
+def gondola_schedule(request: Request) -> Response:
+    lat_str = request.query_params.get("lat", "")
+    lon_str = request.query_params.get("lon", "")
+    if not lat_str or not lon_str:
+        return Response(
+            {"error": "lat and lon are required"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    try:
+        lat = float(lat_str)
+        lon = float(lon_str)
+    except ValueError:
+        return Response(
+            {"error": "lat and lon must be numeric"}, status=status.HTTP_400_BAD_REQUEST
+        )
+    dep_raw = (request.query_params.get("departure_date") or "").strip()[:10]
+    if dep_raw:
+        try:
+            window_start = date.fromisoformat(dep_raw)
+        except ValueError:
+            return Response(
+                {"error": "departure_date must be YYYY-MM-DD"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    else:
+        window_start = date.today()
+    try:
+        stops = get_aerial_lift_stops(lat, lon)
+    except Exception:
+        logger.exception("Gondola stops lookup failed")
+        return Response(
+            {"error": "Failed to fetch gondola stops"},
+            status=status.HTTP_502_BAD_GATEWAY,
+        )
+
+    features = []
+    for stop in stops:
+        stop_id = stop.get("stopId") or stop.get("id", "")
+        if not stop_id:
+            continue
+        try:
+            schedule = probe_gondola_schedule(stop_id, window_start)
+        except Exception:
+            logger.exception("Gondola schedule probe failed for stop_id=%s", stop_id)
+            continue
+        features.append(
+            {
+                "type": "Feature",
+                "geometry": {
+                    "type": "Point",
+                    "coordinates": [stop.get("lon", 0), stop.get("lat", 0)],
+                },
+                "properties": {
+                    "name": stop.get("name", ""),
+                    "stop_id": stop_id,
+                    "schedule_summary": schedule.get("schedule_summary", ""),
+                    "open_dates": schedule.get("open_dates", []),
+                    "weekday_label": schedule.get("weekday_label", ""),
+                    "timetable_available": schedule.get("timetable_available", True),
+                    "day_calendar": schedule.get("day_calendar", []),
+                },
+            }
+        )
+
+    return Response({"type": "FeatureCollection", "features": features})
 
 
 def _routing_backend() -> str:

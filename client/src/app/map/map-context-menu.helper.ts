@@ -5,6 +5,7 @@ export interface ContextMenuActions {
   onPlanHike: () => void;
   onTransitRange: () => void;
   onHikeRanges: () => void;
+  onGondolaSchedule: () => void;
 }
 
 export function buildContextMenuContent(): string {
@@ -20,6 +21,9 @@ export function buildContextMenuContent(): string {
     </button>
     <button class="map-ctx-menu__item" data-action="hike-ranges">
       <span class="map-ctx-menu__icon material-icons">hiking</span>Show hike ranges
+    </button>
+    <button class="map-ctx-menu__item" data-action="gondola-schedule">
+      <span class="map-ctx-menu__icon material-icons">terrain</span>Gondola schedule
     </button>
   </div>`;
 }
@@ -48,6 +52,10 @@ export function setupContextMenuHandlers(
     el.querySelector('[data-action="hike-ranges"]')?.addEventListener('click', () => {
       map.closePopup();
       actions.onHikeRanges();
+    });
+    el.querySelector('[data-action="gondola-schedule"]')?.addEventListener('click', () => {
+      map.closePopup();
+      actions.onGondolaSchedule();
     });
   }, 0);
 }

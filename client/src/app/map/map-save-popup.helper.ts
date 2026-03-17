@@ -1,5 +1,5 @@
 import type * as GeoJSON from 'geojson';
-import type { LocationService } from '../services/location.service';
+import type { LocationService, SavedLocation } from '../services/location.service';
 
 export const POPUP_SAVE_BTN_CLASS = 'popup-save-btn';
 
@@ -26,16 +26,16 @@ export function handleSaveLocationClick(
   feature: GeoJSON.Feature,
   btn: HTMLButtonElement,
   locationService: LocationService,
-  onSaved?: () => void,
+  onSaved?: (saved: SavedLocation) => void,
 ): void {
   btn.disabled = true;
   btn.textContent = 'Saving…';
   locationService
     .saveFromFeature(mapUuid, feature)
-    .then(() => {
+    .then((saved) => {
       btn.textContent = 'Saved';
       btn.classList.add('popup-save-btn--saved');
-      onSaved?.();
+      onSaved?.(saved);
     })
     .catch(() => {
       btn.disabled = false;

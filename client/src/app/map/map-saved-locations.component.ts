@@ -80,9 +80,7 @@ function escapeHtml(text: string): string {
 }
 
 function escapeHref(url: string): string {
-  return escapeHtml(url)
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
+  return escapeHtml(url).replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 function buildSavedLocationPopupHtml(
@@ -192,9 +190,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
           if (locationId != null) {
             layer.on('click', () => {
               if (showReachabilityIsochronesForCategory(cat)) {
-                this.ngZone.run(() =>
-                  this.locationRangesRequested.emit(locationId as number),
-                );
+                this.ngZone.run(() => this.locationRangesRequested.emit(locationId as number));
               }
             });
             layer.on('popupopen', (e: L.PopupEvent) => {
@@ -205,14 +201,7 @@ export class MapSavedLocationsComponent implements OnDestroy {
               const editBtn = popupEl?.querySelector<HTMLButtonElement>('.saved-location-edit-btn');
               const deleteHandler = () => this.deleteSavedLocation(locationId, layer);
               const editHandler = () =>
-                this.openEditLocationDialog(
-                  locationId,
-                  label,
-                  cat,
-                  desc ?? '',
-                  link ?? '',
-                  layer,
-                );
+                this.openEditLocationDialog(locationId, label, cat, desc ?? '', link ?? '', layer);
               deleteBtn?.addEventListener('click', deleteHandler);
               editBtn?.addEventListener('click', editHandler);
               layer.once('popupclose', () => {
@@ -323,7 +312,12 @@ export class MapSavedLocationsComponent implements OnDestroy {
         const uuid = this.mapUuid();
         this.locationService
           .savePoint(uuid, lat, lng, result.name, result.category, result.description, result.link)
-          .then(() => this.loadSavedLocations())
+          .then(async (saved) => {
+            await this.loadSavedLocations();
+            if (showReachabilityIsochronesForCategory(saved.category)) {
+              this.ngZone.run(() => this.locationRangesRequested.emit(saved.id));
+            }
+          })
           .catch((err) => console.error('Failed to save location', err));
       });
     });
@@ -359,8 +353,12 @@ export class MapSavedLocationsComponent implements OnDestroy {
             ?.querySelector<HTMLButtonElement>(`.${POPUP_SAVE_BTN_CLASS}`);
           if (!btn) return;
           btn.addEventListener('click', () =>
-            handleSaveLocationClick(this.mapUuid(), feature, btn, this.locationService, () =>
-              this.loadSavedLocations(),
+            handleSaveLocationClick(this.mapUuid(), feature, btn, this.locationService, (saved) =>
+              this.loadSavedLocations().then(() => {
+                if (showReachabilityIsochronesForCategory(saved.category)) {
+                  this.ngZone.run(() => this.locationRangesRequested.emit(saved.id));
+                }
+              }),
             ),
           );
         });

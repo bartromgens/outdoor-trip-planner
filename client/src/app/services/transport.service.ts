@@ -49,6 +49,28 @@ export interface ReachabilityResult {
   query_datetime?: string;
 }
 
+export interface GondolaDayCalendar {
+  date_iso: string;
+  date_label: string;
+  weekday: string;
+  open: boolean;
+}
+
+export interface GondolaStop {
+  name: string;
+  stop_id: string;
+  schedule_summary: string;
+  open_dates: string[];
+  weekday_label: string;
+  /** False when the feed has no stoptimes for this stop (e.g. API 404). */
+  timetable_available?: boolean;
+  day_calendar?: GondolaDayCalendar[];
+}
+
+export interface GondolaScheduleResult {
+  type: 'FeatureCollection';
+  features: GeoJSON.Feature<GeoJSON.Point, GondolaStop>[];
+}
 
 export interface AppConfig {
   routingBackend: string;
@@ -108,6 +130,21 @@ export class TransportService {
     return resp.json() as Promise<HikeIsochroneResult>;
   }
 
+  async getGondolaSchedule(
+    lat: number,
+    lon: number,
+    departureDate: string,
+  ): Promise<GondolaScheduleResult> {
+    const params = new URLSearchParams({
+      lat: String(lat),
+      lon: String(lon),
+      departure_date: departureDate,
+    });
+    const resp = await fetch(`/api/gondola-schedule/?${params}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    return resp.json() as Promise<GondolaScheduleResult>;
+  }
+
   async getLocationReachability(
     mapUuid: string,
     locationId: number,
@@ -134,5 +171,4 @@ export class TransportService {
     }
     return result;
   }
-
 }

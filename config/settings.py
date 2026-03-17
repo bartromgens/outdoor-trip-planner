@@ -101,7 +101,25 @@ LOGGING = {
             "formatter": "colored",
         },
     },
+    "root": {
+        "handlers": ["console"],
+    },
     "loggers": {
+        "django": {
+            "level": "INFO",
+        },
+        "django.server": {
+            "level": "INFO",
+        },
+        "django.db.backends": {
+            "level": "WARNING",
+        },
+        "urllib3": {
+            "level": "WARNING",
+        },
+        "httpx": {
+            "level": "WARNING",
+        },
         "api": {
             "handlers": ["console"],
             "level": "DEBUG",
@@ -126,3 +144,4 @@ try:
     from .settings_local import *  # noqa: F401 F403
 except ImportError:
     pass
+

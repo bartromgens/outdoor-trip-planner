@@ -32,17 +32,16 @@ import {
   handleSaveLocationClick,
   POPUP_SAVE_BTN_CLASS,
 } from './map-save-popup.helper';
-import {
-  buildContextMenuContent,
-  setupContextMenuHandlers,
-} from './map-context-menu.helper';
+import { buildContextMenuContent, setupContextMenuHandlers } from './map-context-menu.helper';
 import { MapContourService } from '../services/map-contour.service';
 import { MapControlsComponent } from './map-controls.component';
 import { HikePlanningComponent } from './hike-planning.component';
 import { MapReachabilityComponent } from './map-reachability.component';
 import { MapSavedLocationsComponent } from './map-saved-locations.component';
 import { ElevationProfileComponent } from './elevation-profile.component';
+import { GondolaScheduleComponent } from './gondola-schedule.component';
 import { circleMarkerIcon } from './map-marker-icons';
+import { showReachabilityIsochronesForCategory } from './location-categories';
 
 const MOBILE_BREAKPOINT = '(max-width: 768px)';
 
@@ -62,6 +61,7 @@ function searchResultLocationName(fullLabel: string): string {
     MapReachabilityComponent,
     MapSavedLocationsComponent,
     ElevationProfileComponent,
+    GondolaScheduleComponent,
   ],
 })
 export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
@@ -84,6 +84,7 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('hikePlanning') private hikePlanningComp!: HikePlanningComponent;
   @ViewChild('reachability') private reachabilityComp!: MapReachabilityComponent;
   @ViewChild('savedLocations') private savedLocationsComp!: MapSavedLocationsComponent;
+  @ViewChild('gondolaSchedule') private gondolaScheduleComp!: GondolaScheduleComponent;
 
   private map!: L.Map;
   private layerControl!: L.Control.Layers;
@@ -180,8 +181,14 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
     this.hikePlanningComp.init(this.map, this.layerControl);
     this.reachabilityComp.init(this.map, this.layerControl, () => this.activeOverlayNames);
     this.savedLocationsComp.init(this.map);
+    this.gondolaScheduleComp.init(this.map, this.layerControl);
 
-    this.mapContour.loadContourLayers(this.map, this.layerControl, this.urlOverlays, this.activeOverlayNames);
+    this.mapContour.loadContourLayers(
+      this.map,
+      this.layerControl,
+      this.urlOverlays,
+      this.activeOverlayNames,
+    );
     this.mapReady = true;
 
     const pendingSearch = this.locationSearch.resultToShow();
@@ -283,8 +290,9 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
           this.hikePlanningComp.addWaypointAt(lat, lng);
         }),
       onTransitRange: () => this.ngZone.run(() => this.reachabilityComp.loadReachability(lat, lng)),
-      onHikeRanges: () =>
-        this.ngZone.run(() => this.reachabilityComp.loadHikeIsochrone(lat, lng)),
+      onHikeRanges: () => this.ngZone.run(() => this.reachabilityComp.loadHikeIsochrone(lat, lng)),
+      onGondolaSchedule: () =>
+        this.ngZone.run(() => this.gondolaScheduleComp.loadGondolaSchedule(lat, lng)),
     });
   }
 
@@ -344,8 +352,14 @@ export class MapComponent implements OnInit, AfterViewInit, OnDestroy {
         ?.querySelector<HTMLButtonElement>(`.${POPUP_SAVE_BTN_CLASS}`);
       if (!btn) return;
       btn.addEventListener('click', () =>
-        handleSaveLocationClick(this.currentMapUuid, feature, btn, this.locationService, () =>
-          this.savedLocationsComp.loadSavedLocations(),
+        handleSaveLocationClick(this.currentMapUuid, feature, btn, this.locationService, (saved) =>
+          this.savedLocationsComp.loadSavedLocations().then(() => {
+            if (showReachabilityIsochronesForCategory(saved.category)) {
+              this.ngZone.run(() =>
+                this.reachabilityComp.loadRangesForLocation(this.currentMapUuid, saved.id),
+              );
+            }
+          }),
         ),
       );
     });

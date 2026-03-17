@@ -12,6 +12,7 @@ urlpatterns = [
     path("locations/<int:pk>/", views.location_detail, name="location-detail"),
     path("contours/<int:elevation>/", views.contour, name="contour"),
     path("reachability/", views.reachability, name="reachability"),
+    path("gondola-schedule/", views.gondola_schedule, name="gondola-schedule"),
     path("hike-isochrone/", views.hike_isochrone, name="hike-isochrone"),
     path("hike-directions/", views.hike_directions, name="hike-directions"),
     path("hike-routes/", views.hike_routes, name="hike-routes"),
