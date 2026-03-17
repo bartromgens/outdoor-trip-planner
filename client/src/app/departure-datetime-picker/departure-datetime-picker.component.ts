@@ -55,8 +55,15 @@ export class DepartureDatetimePickerComponent implements OnInit {
   }
 
   private _syncToService(): void {
+    const dep = this.tripDateTime.departureTime();
     if (!this.pickerDate) {
-      this.tripDateTime.set(null);
+      // While typing, Material often emits null for invalid/partial input; do not
+      // clear the service or APIs fall back to "today" while the field still shows text.
+      if (dep && this.pickerTime) {
+        const d = new Date(dep);
+        d.setHours(this.pickerTime.getHours(), this.pickerTime.getMinutes(), 0, 0);
+        this.tripDateTime.set(d);
+      }
       return;
     }
     const d = new Date(this.pickerDate);
