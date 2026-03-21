@@ -52,9 +52,7 @@ function formatElevationStats(
   return `<br><span style="font-size:12px">&#8593; ${ascentM} m &nbsp; &#8595; ${descentM} m</span>`;
 }
 
-function elevationRangeFromProfile(
-  profile: [number, number][] | null | undefined,
-): number | null {
+function elevationRangeFromProfile(profile: [number, number][] | null | undefined): number | null {
   if (!profile?.length) return null;
   const elevations = profile.map((p) => p[1]);
   const min = Math.min(...elevations);
@@ -75,6 +73,18 @@ export interface HikeRouteStats {
   descent_m: number | null;
   elevation_range_m: number | null;
 }
+
+const SAVED_HIKE_ROUTE_STYLE_DEFAULT: L.PathOptions = {
+  color: '#1565c0',
+  weight: 5,
+  opacity: 0.75,
+};
+
+const SAVED_HIKE_ROUTE_STYLE_SELECTED: L.PathOptions = {
+  color: '#7b1fa2',
+  weight: 6,
+  opacity: 0.95,
+};
 
 @Component({
   selector: 'app-hike-planning',
@@ -104,6 +114,7 @@ export class HikePlanningComponent implements OnDestroy {
   private _hikeRouteLayer?: L.GeoJSON;
   private lastHikeDirectionsResult: HikeDirectionsResult | null = null;
   private savedHikesLayer?: L.LayerGroup;
+  private readonly savedHikeGeoJsonById = new Map<number, L.GeoJSON>();
 
   hikeLoading = false;
   editingRouteId: number | null = null;
@@ -229,6 +240,7 @@ export class HikePlanningComponent implements OnDestroy {
         this.layerControl.removeLayer(this.savedHikesLayer);
         this.map.removeLayer(this.savedHikesLayer);
       }
+      this.savedHikeGeoJsonById.clear();
 
       const layers = routes.map((route) => {
         const geojson: GeoJSON.Feature<GeoJSON.LineString> = {
@@ -237,8 +249,9 @@ export class HikePlanningComponent implements OnDestroy {
           properties: {},
         };
         const layer = L.geoJSON(geojson, {
-          style: { color: '#1565c0', weight: 5, opacity: 0.75 },
+          style: SAVED_HIKE_ROUTE_STYLE_DEFAULT,
         });
+        this.savedHikeGeoJsonById.set(route.id, layer);
 
         const distKm = route.distance_m != null ? (route.distance_m / 1000).toFixed(1) : '?';
         const dur = route.duration_s != null ? formatRouteDuration(route.duration_s) : '?';
@@ -259,6 +272,7 @@ export class HikePlanningComponent implements OnDestroy {
         );
 
         layer.on('popupopen', () => {
+          this.setSavedHikeRouteHighlight(route.id);
           this.ngZone.run(() => {
             this.elevationProfile.emit(route.elevation_profile ?? null);
             this.selectedHikeIdChange.emit(route.id);
@@ -285,6 +299,7 @@ export class HikePlanningComponent implements OnDestroy {
         });
 
         layer.on('popupclose', () => {
+          this.setSavedHikeRouteHighlight(null);
           this.ngZone.run(() => {
             this.elevationProfile.emit(null);
             this.selectedHikeIdChange.emit(null);
@@ -298,6 +313,14 @@ export class HikePlanningComponent implements OnDestroy {
       this.layerControl.addOverlay(this.savedHikesLayer, 'Saved hikes');
     } catch {
       console.error('Failed to load saved hikes');
+    }
+  }
+
+  private setSavedHikeRouteHighlight(selectedId: number | null): void {
+    for (const [id, geo] of this.savedHikeGeoJsonById) {
+      geo.setStyle(
+        id === selectedId ? SAVED_HIKE_ROUTE_STYLE_SELECTED : SAVED_HIKE_ROUTE_STYLE_DEFAULT,
+      );
     }
   }
 
