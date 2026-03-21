@@ -7,11 +7,15 @@ import { MatInputModule } from '@angular/material/input';
 
 export interface SaveHikeDialogData {
   existingName?: string;
+  existingColor?: string;
 }
 
 export interface SaveHikeDialogResult {
   name: string;
+  color: string;
 }
+
+const DEFAULT_COLOR = '#1565c0';
 
 @Component({
   selector: 'app-save-hike-dialog',
@@ -34,6 +38,15 @@ export interface SaveHikeDialogResult {
             <mat-error>Name is required</mat-error>
           }
         </mat-form-field>
+        <div class="color-row">
+          <label class="color-label" for="trail-color">Trail color</label>
+          <input
+            id="trail-color"
+            type="color"
+            formControlName="color"
+            class="color-input"
+          />
+        </div>
       </form>
     </mat-dialog-content>
     <mat-dialog-actions align="end">
@@ -51,6 +64,26 @@ export interface SaveHikeDialogResult {
       mat-dialog-content {
         min-width: 300px;
       }
+      .color-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 4px;
+        margin-bottom: 8px;
+      }
+      .color-label {
+        font-size: 14px;
+        color: rgba(0, 0, 0, 0.6);
+      }
+      .color-input {
+        width: 48px;
+        height: 32px;
+        padding: 2px;
+        border: 1px solid rgba(0, 0, 0, 0.38);
+        border-radius: 4px;
+        cursor: pointer;
+        background: none;
+      }
     `,
   ],
 })
@@ -63,6 +96,9 @@ export class SaveHikeDialogComponent {
       nonNullable: true,
       validators: [Validators.required],
     }),
+    color: new FormControl(this.data.existingColor ?? DEFAULT_COLOR, {
+      nonNullable: true,
+    }),
   });
 
   submit(): void {
@@ -70,7 +106,10 @@ export class SaveHikeDialogComponent {
       this.form.markAllAsTouched();
       return;
     }
-    const result: SaveHikeDialogResult = { name: this.form.controls.name.value };
+    const result: SaveHikeDialogResult = {
+      name: this.form.controls.name.value,
+      color: this.form.controls.color.value,
+    };
     this.dialogRef.close(result);
   }
 }

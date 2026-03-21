@@ -74,17 +74,11 @@ export interface HikeRouteStats {
   elevation_range_m: number | null;
 }
 
-const SAVED_HIKE_ROUTE_STYLE_DEFAULT: L.PathOptions = {
-  color: '#1565c0',
-  weight: 5,
-  opacity: 0.75,
-};
+const DEFAULT_TRAIL_COLOR = '#1565c0';
 
-const SAVED_HIKE_ROUTE_STYLE_SELECTED: L.PathOptions = {
-  color: '#7b1fa2',
-  weight: 6,
-  opacity: 0.95,
-};
+function savedRouteStyle(color: string, selected = false): L.PathOptions {
+  return { color, weight: selected ? 6 : 5, opacity: selected ? 0.95 : 0.75 };
+}
 
 @Component({
   selector: 'app-hike-planning',
@@ -119,6 +113,7 @@ export class HikePlanningComponent implements OnDestroy {
   hikeLoading = false;
   editingRouteId: number | null = null;
   editingRouteName: string | null = null;
+  editingRouteColor: string = DEFAULT_TRAIL_COLOR;
   readonly routeStats = signal<HikeRouteStats | null>(null);
   readonly savedHikeRoutes = signal<SavedHikeRoute[]>([]);
 
@@ -159,6 +154,7 @@ export class HikePlanningComponent implements OnDestroy {
     this.hikeLoading = false;
     this.editingRouteId = null;
     this.editingRouteName = null;
+    this.editingRouteColor = DEFAULT_TRAIL_COLOR;
     this.lastHikeDirectionsResult = null;
     this.routeStats.set(null);
     this.elevationProfile.emit(null);
@@ -167,11 +163,12 @@ export class HikePlanningComponent implements OnDestroy {
   saveHikeRoute(): void {
     this.ngZone.run(() => {
       const ref = this.dialog.open(SaveHikeDialogComponent, {
-        data: {},
+        data: { existingColor: this.editingRouteColor },
         width: '360px',
       });
       ref.afterClosed().subscribe(async (result: SaveHikeDialogResult | undefined) => {
         if (!result) return;
+        this.editingRouteColor = result.color;
         await this.persistHikeRoute(result.name, false);
       });
     });
@@ -181,11 +178,15 @@ export class HikePlanningComponent implements OnDestroy {
     if (!this.editingRouteId) return;
     this.ngZone.run(() => {
       const ref = this.dialog.open(SaveHikeDialogComponent, {
-        data: { existingName: this.editingRouteName ?? undefined },
+        data: {
+          existingName: this.editingRouteName ?? undefined,
+          existingColor: this.editingRouteColor,
+        },
         width: '360px',
       });
       ref.afterClosed().subscribe(async (result: SaveHikeDialogResult | undefined) => {
         if (!result) return;
+        this.editingRouteColor = result.color;
         await this.persistHikeRoute(result.name, true);
       });
     });
@@ -209,6 +210,7 @@ export class HikePlanningComponent implements OnDestroy {
     this.clearHikeRoute();
     this.editingRouteId = route.id;
     this.editingRouteName = route.name;
+    this.editingRouteColor = route.color || DEFAULT_TRAIL_COLOR;
     for (const [lon, lat] of route.waypoints) {
       const latlng = L.latLng(lat, lon);
       this.hikeWaypoints.push(latlng);
@@ -249,7 +251,7 @@ export class HikePlanningComponent implements OnDestroy {
           properties: {},
         };
         const layer = L.geoJSON(geojson, {
-          style: SAVED_HIKE_ROUTE_STYLE_DEFAULT,
+          style: savedRouteStyle(route.color || DEFAULT_TRAIL_COLOR),
         });
         this.savedHikeGeoJsonById.set(route.id, layer);
 
@@ -317,10 +319,11 @@ export class HikePlanningComponent implements OnDestroy {
   }
 
   private setSavedHikeRouteHighlight(selectedId: number | null): void {
+    const routes = this.savedHikeRoutes();
     for (const [id, geo] of this.savedHikeGeoJsonById) {
-      geo.setStyle(
-        id === selectedId ? SAVED_HIKE_ROUTE_STYLE_SELECTED : SAVED_HIKE_ROUTE_STYLE_DEFAULT,
-      );
+      const route = routes.find((r) => r.id === id);
+      const color = route?.color || DEFAULT_TRAIL_COLOR;
+      geo.setStyle(savedRouteStyle(color, id === selectedId));
     }
   }
 
@@ -483,6 +486,7 @@ export class HikePlanningComponent implements OnDestroy {
       ascent_m: summary?.['ascent_m'] ?? null,
       descent_m: summary?.['descent_m'] ?? null,
       elevation_profile: summary?.['elevation_profile'] ?? null,
+      color: this.editingRouteColor,
     };
 
     const uuid = this.mapUuid();

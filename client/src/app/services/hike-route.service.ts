@@ -12,6 +12,7 @@ export interface SavedHikeRoute {
   ascent_m: number | null;
   descent_m: number | null;
   elevation_profile: [number, number][] | null;
+  color: string;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,7 @@ interface HikeRoutePayload {
   ascent_m: number | null;
   descent_m: number | null;
   elevation_profile: [number, number][] | null;
+  color: string;
 }
 
 @Injectable({ providedIn: 'root' })

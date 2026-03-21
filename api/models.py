@@ -35,6 +35,7 @@ class HikeRoute(models.Model):
     elevation_profile = models.JSONField(
         null=True, blank=True, help_text="[[dist_m, elev_m], ...] elevation profile"
     )
+    color = models.CharField(max_length=20, default="#1565c0", blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
